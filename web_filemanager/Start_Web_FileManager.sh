@@ -51,7 +51,7 @@ else
     DB_PATH="/usr/local/share/filebrowser.db"
     mkdir -p "$(dirname "$DB_PATH")"
     
-    nohup "$FB_BIN" --noauth -a 0.0.0.0 -p 8080 -r "$ROOT_DIR" -d "$DB_PATH" > /tmp/filebrowser.log 2>&1 &
+    nohup "$FB_BIN" --noauth -a 0.0.0.0 -p 80 -r "$ROOT_DIR" -d "$DB_PATH" > /tmp/filebrowser.log 2>&1 &
     sleep 2
 fi
 
@@ -60,14 +60,14 @@ if pgrep -f "$FB_BIN" > /dev/null 2>&1; then
     print_msg "=================================================="
     if [ -n "$IP_ADDR" ]; then
         print_msg " เปิดเว็บเบราว์เซอร์บนมือถือหรือคอมพิวเตอร์:"
-        print_msg " --> http://${IP_ADDR}:8080"
+        print_msg " --> http://${IP_ADDR}"
     else
         print_msg " [!] ยังไม่ได้เชื่อมต่อ Wi-Fi"
-        print_msg " เชื่อมต่อ Wi-Fi แล้วเข้าผ่าน IP:8080"
+        print_msg " เชื่อมต่อ Wi-Fi แล้วเข้าผ่าน http://<IP>"
     fi
     print_msg "=================================================="
     print_msg " - โฟลเดอร์: /roms (เกม, เซฟ, Tools)"
-    print_msg " - เข้าได้ทันที ไม่ต้องใส่รหัสผ่าน"
+    print_msg " - เข้าได้ทันที ไม่ต้องใส่รหัสผ่าน (พอร์ต 80)"
     print_msg " - เมื่อใช้งานเสร็จ เลือก 'Stop Web File Manager'"
     print_msg "=================================================="
 else

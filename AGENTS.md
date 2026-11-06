@@ -13,6 +13,19 @@ The goal is to provide reliable, plug-and-play, and offline-first tools that sea
 * **Operating System:** playOS
 * **Linux Kernel Version:** `4.4.189`
 * **Target Display Console:** `/dev/tty1` (EmulationStation framebuffer / text console)
+* **SSH Access & Authentication:**
+  * **Port:** `22` (OpenSSH)
+  * **Default User:** `ark`
+  * **Default Password:** `ark`
+  * **Privilege Escalation:** Direct root SSH password login is disabled (`PermitRootLogin prohibit-password`). Must login as `ark` and escalate via `sudo -i` or `sudo <cmd>`.
+* **Runtime & Scripting Environments:**
+  * **Shell:** Bash (`/bin/bash`), Sh (`/bin/sh`)
+  * **Python 3:** `/usr/bin/python3` (Python `3.13.5` pre-installed)
+  * **Pip:** `/usr/lib/python3/dist-packages/pip` (pip `25.1.1` pre-installed)
+* **Network & Port Conventions:**
+  * **Port 22:** SSH server
+  * **Port 80:** Standalone Web File Manager (noauth, scoped to `/roms/`)
+  * **Port 7681:** Standalone Web Terminal (ttyd, root shell)
 * **Target Filesystem Layout:**
   * SD Card ROMs partition: `/roms/`
   * EmulationStation Tools menu: `/roms/tools/`
@@ -39,6 +52,12 @@ d:\me\r36h\tools\
 │   ├── Install_Web_FileManager.sh   <-- Setup script
 │   ├── Start_Web_FileManager.sh     <-- Launcher with on-screen IP display
 │   ├── Stop_Web_FileManager.sh      <-- Teardown script to reclaim RAM for games
+│   └── README.txt                    <-- User guide
+├── web_terminal/                     <-- Wireless Web Terminal (ttyd)
+│   ├── ttyd                          <-- ARM64 standalone binary
+│   ├── Install_Web_Terminal.sh      <-- Setup script
+│   ├── Start_Web_Terminal.sh        <-- Launcher with on-screen IP display
+│   ├── Stop_Web_Terminal.sh         <-- Teardown script to reclaim RAM for games
 │   └── README.txt                    <-- User guide
 ├── check_usb/                        <-- USB Hardware Diagnostics
 │   ├── check_usb.sh                 <-- lsusb & loaded module inspector
