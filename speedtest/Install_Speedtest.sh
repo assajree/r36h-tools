@@ -49,19 +49,27 @@ ln -sf "${BIN_DIR}/speedtest_runner.py" "${BIN_DIR}/speedtest"
 ln -sf "${BIN_DIR}/speedtest.py" "${BIN_DIR}/speedtest-cli"
 print_msg " [✓] ติดตั้ง CLI speedtest เรียบร้อย (พิมพ์ speedtest ใน terminal ได้ทันที)"
 
-# 3. Install menu item to /roms/tools/
+# 3. Install menu item & cover art to /roms/tools/
 print_msg "\n[3/4] ติดตั้งเมนู Speedtest ไปยัง ${TOOLS_DIR}..."
 mkdir -p "$TOOLS_DIR"
+mkdir -p "${TOOLS_DIR}/images"
 TARGET_TOOL="${TOOLS_DIR}/Speedtest.sh"
 
 cp -f "${SCRIPT_DIR}/speedtest.sh" "$TARGET_TOOL"
 chmod 755 "$TARGET_TOOL"
+
+if [ -f "${SCRIPT_DIR}/Speedtest-thumb.png" ]; then
+    cp -f "${SCRIPT_DIR}/Speedtest-thumb.png" "${TOOLS_DIR}/images/Speedtest-thumb.png"
+fi
 
 # Also ensure /roms/tools/speedtest directory exists with all source scripts
 mkdir -p "${TOOLS_DIR}/speedtest"
 cp -f "${SCRIPT_DIR}/speedtest.py" "${TOOLS_DIR}/speedtest/"
 cp -f "${SCRIPT_DIR}/speedtest_runner.py" "${TOOLS_DIR}/speedtest/"
 cp -f "${SCRIPT_DIR}/speedtest.sh" "${TOOLS_DIR}/speedtest/"
+if [ -f "${SCRIPT_DIR}/Speedtest-thumb.png" ]; then
+    cp -f "${SCRIPT_DIR}/Speedtest-thumb.png" "${TOOLS_DIR}/speedtest/"
+fi
 chmod 755 "${TOOLS_DIR}/speedtest/"*.sh "${TOOLS_DIR}/speedtest/"*.py 2>/dev/null || true
 
 print_msg " [✓] สร้างเมนู ${TARGET_TOOL} สำเร็จ"

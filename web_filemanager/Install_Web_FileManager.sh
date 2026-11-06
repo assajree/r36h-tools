@@ -62,20 +62,27 @@ print_msg " [✓] ตั้งค่าฐานข้อมูลโหมด�
 # 3. Create Tools directory if needed
 print_msg "\n[3/4] ติดตั้งเมนูเครื่องมือไปยัง ${TOOLS_DIR}..."
 mkdir -p "$TOOLS_DIR"
+mkdir -p "${TOOLS_DIR}/images"
 
-# 3.1 Install Start Script
+# 3.1 Install Start Script & Cover Art
 if [ -f "${SCRIPT_DIR}/Start_Web_FileManager.sh" ]; then
     cp -v "${SCRIPT_DIR}/Start_Web_FileManager.sh" "${TOOLS_DIR}/Start_Web_FileManager.sh"
     chmod 755 "${TOOLS_DIR}/Start_Web_FileManager.sh"
 fi
+if [ -f "${SCRIPT_DIR}/Start_Web_FileManager-thumb.png" ]; then
+    cp -f "${SCRIPT_DIR}/Start_Web_FileManager-thumb.png" "${TOOLS_DIR}/images/Start_Web_FileManager-thumb.png"
+fi
 
-# 3.2 Install Stop Script
+# 3.2 Install Stop Script & Cover Art
 if [ -f "${SCRIPT_DIR}/Stop_Web_FileManager.sh" ]; then
     cp -v "${SCRIPT_DIR}/Stop_Web_FileManager.sh" "${TOOLS_DIR}/Stop_Web_FileManager.sh"
     chmod 755 "${TOOLS_DIR}/Stop_Web_FileManager.sh"
 fi
+if [ -f "${SCRIPT_DIR}/Stop_Web_FileManager-thumb.png" ]; then
+    cp -f "${SCRIPT_DIR}/Stop_Web_FileManager-thumb.png" "${TOOLS_DIR}/images/Stop_Web_FileManager-thumb.png"
+fi
 
-print_msg " [✓] ติดตั้ง Start_Web_FileManager.sh และ Stop_Web_FileManager.sh ใน ${TOOLS_DIR} เรียบร้อย"
+print_msg " [✓] ติดตั้ง Start_Web_FileManager.sh, Stop_Web_FileManager.sh และรูปปกใน ${TOOLS_DIR} เรียบร้อย"
 
 # 4. Create optional systemd service
 print_msg "\n[4/4] กำหนดค่า Service ในระบบ..."

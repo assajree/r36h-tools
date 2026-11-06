@@ -40,6 +40,8 @@ The goal is to provide reliable, plug-and-play, and offline-first tools that sea
 ```text
 d:\me\r36h\tools\
 ├── AGENTS.md                         <-- Master workspace rules & specifications
+├── ARCHETYPES.md                     <-- Standardized tool archetypes & layout rules
+├── PLAYFE_MENU_GUIDE.md              <-- playOS 4.0 Frontend (playfe) menu & cover art guide
 ├── mercusys_wifi/                    <-- Wi-Fi Driver & Persistence Tool
 │   ├── Install_Mercusys_WiFi.sh     <-- All-in-one standalone installer
 │   ├── Uninstall_Mercusys_WiFi.sh   <-- Clean uninstaller script
@@ -75,26 +77,53 @@ d:\me\r36h\tools\
 │   ├── speedtest.sh                 <-- Dual-output launcher for EmulationStation & CLI
 │   ├── Install_Speedtest.sh         <-- Standalone installer for /roms/tools/ & PATH
 │   └── README.txt                   <-- User guide & instructions
-├── screenshot/                       <-- Framebuffer Screen Capture Utility
-│   ├── screenshot.sh                <-- Dual-output capture script (fbdev /dev/fb0)
-│   ├── Install_Screenshot.sh        <-- Standalone installer for /roms/tools/ & PATH
-│   └── README.txt                   <-- User guide & instructions
+├── screenshot/                       <-- Framebuffer Screen Capture Utility & Hotkey Daemon
+│   ├── Install_Screenshot.sh        <-- Standalone installer (CLI & Systemd Daemon)
+│   ├── Status_Screenshot.sh         <-- Status inspector & realtime Button Tester
+│   ├── Uninstall_Screenshot.sh      <-- Clean uninstaller (removes daemon & CLI)
+│   ├── README.txt                   <-- User guide & instructions
+│   ├── app/                         <-- Internal application subfolder
+│   │   └── screenshot.sh            <-- CLI capture script (fbdev /dev/fb0)
+│   └── daemon/                      <-- Internal daemon subfolder
+│       ├── screenshot_daemon.py     <-- Python SELECT+Y listener with shutter flash
+│       └── screenshot-daemon.service <-- Systemd background service unit
 ├── quick_tools/                      <-- Top-level Shortcut Utility (00_tools)
-│   ├── Create_Quick_Tools.sh        <-- Dual-output launcher for /roms/tools/ & CLI
-│   ├── Install_Quick_Tools.sh       <-- Standalone installer for /roms/tools/
+│   ├── Install_Quick_Tools.sh       <-- Standalone installer for /roms/00_tools bind mount
+│   ├── Uninstall_Quick_Tools.sh     <-- Clean uninstaller for /roms/00_tools
+│   └── README.txt                   <-- User guide & instructions
+├── tools_menu/                       <-- playOS 4.0 TOOLS Menu Enabler (es_systems.cfg)
+│   ├── Install_Tools_Menu.sh        <-- Enables <name>tools</name> in es_systems.cfg & restarts playfe
+│   ├── Uninstall_Tools_Menu.sh      <-- Removes <name>tools</name> from es_systems.cfg
 │   └── README.txt                   <-- User guide & instructions
 ├── screen_off/                       <-- Screen Preserver / Backlight Shutoff Utility
-│   ├── Screen_Off.sh                <-- Dual-output screen off & evdev wake launcher
 │   ├── Install_Screen_Off.sh        <-- Standalone installer for /roms/tools/ & PATH
-│   └── README.txt                   <-- User guide & instructions
+│   ├── Uninstall_Screen_Off.sh      <-- Clean uninstaller for full Screen Off suite
+│   ├── Setup_Auto_Screen_Off.sh     <-- One-click setup for Auto Screen Off (1 min idle)
+│   ├── Status_Auto_Screen_Off.sh    <-- Status inspector (PID, RAM, service status, logs)
+│   ├── Uninstall_Auto_Screen_Off.sh <-- Teardown script for Auto Screen Off daemon only
+│   ├── README.txt                   <-- User guide & instructions
+│   ├── app/                         <-- Internal application subfolder
+│   │   └── Screen_Off.sh            <-- Dual-output screen off & dual-input wake launcher
+│   └── daemon/                      <-- Auto screen off daemon subfolder
+│       ├── auto_screen_off_daemon.py <-- Python idle listener (60s timeout)
+│       └── auto-screen-off.service  <-- Systemd background service unit
 ├── power_button/                     <-- Power Button Hold-to-Shutdown Daemon
+│   ├── Setup_UI.sh                  <-- Interactive Windows XP Setup UI Wizard (SDL2)
 │   ├── Install_Power_Button.sh      <-- Standalone installer & service activator
 │   ├── Status_Power_Button.sh       <-- Status inspector (PID, RAM, device, logs)
 │   ├── Uninstall_Power_Button.sh    <-- Clean uninstaller & teardown script
 │   ├── README.txt                   <-- User guide & instructions
 │   └── daemon/                      <-- Internal daemon subfolder
+│       ├── xp_setup_ui              <-- Standalone ARM64 Universal Setup UI binary
+│       ├── countdown_ui             <-- Standalone ARM64 Countdown Overlay binary
 │       ├── power_button_daemon.py   <-- Python PMIC event listener (3s hold trigger)
 │       └── power-button-daemon.service <-- Systemd background service unit
+├── xp_setup_ui/                      <-- Universal Windows XP Setup UI Engine (Reusable)
+│   ├── xp_setup_ui.c                <-- Direct SDL2 KMSDRM Universal Setup UI source
+│   ├── countdown_ui.c               <-- Direct SDL2 KMSDRM Countdown Overlay source
+│   ├── xp_setup_ui                  <-- Pre-compiled ARM64 binary for any tool
+│   ├── Demo_Setup.sh                <-- Template launcher script with inline config
+│   └── README.txt                   <-- Integration & customization manual
 ├── rtl/                              <-- Realtek firmware repository (dArkOS origin)
 └── XNL RTL8188FTV/                   <-- Reference RTL8188FU driver archive
 ```
@@ -186,6 +215,20 @@ To keep the user-facing workspace and `/roms/tools/` clean and intuitive, all to
 
 ---
 
+### 4.2 Universal Setup UI Engine (`xp_setup_ui`) Usage Policy
+
+The workspace provides a reusable C/SDL2 KMSDRM graphical setup wizard engine in [`xp_setup_ui/`](file:///d:/me/r36h/tools/xp_setup_ui/).
+
+* **When to Use `xp_setup_ui`:**
+  * Use `xp_setup_ui` **ONLY** when the user explicitly requests a graphical UI, Setup Wizard, or controller-navigable options menu (`UP/DOWN` to select options, `LEFT/RIGHT` to select `[ OK ]` / `[ Back ]` / `[ Exit ]`, and `A` or `B` to confirm).
+  * By default, standard installers (`Install_<Tool>.sh`) should remain simple, non-interactive shell scripts unless a UI/Wizard is requested.
+* **How to Package & Integrate (`No Recompilation Needed`):**
+  * Copy **only** the pre-compiled ARM64 binary [`xp_setup_ui/xp_setup_ui`](file:///d:/me/r36h/tools/xp_setup_ui/xp_setup_ui) into the target tool's internal subfolder (`<tool_name>/daemon/xp_setup_ui` or `<tool_name>/app/xp_setup_ui`).
+  * **Never** clutter individual tool folders with `.c` source files (`xp_setup_ui.c`, `countdown_ui.c`). All C source code is maintained centrally in [`xp_setup_ui/`](file:///d:/me/r36h/tools/xp_setup_ui/).
+  * Create the launcher script (e.g., `Setup_UI.sh` based on [`xp_setup_ui/Demo_Setup.sh`](file:///d:/me/r36h/tools/xp_setup_ui/Demo_Setup.sh)) that pauses `FindManager|playfe` (`pkill -STOP -f "FindManager|playfe"`), pipes the custom `header`, `[page]`, and `[progress]` configuration block to `xp_setup_ui - << 'EOF'`, and resumes `FindManager|playfe` (`pkill -CONT -f "FindManager|playfe"`) on exit.
+
+---
+
 ## 5. Universal Constraints & Rules for AI Agents
 
 When authoring, modifying, or packaging tools for playOS on R36H, AI agents **MUST** follow these rules:
@@ -213,6 +256,13 @@ When authoring, modifying, or packaging tools for playOS on R36H, AI agents **MU
 
 5. **Do Not Automatically Generate ZIP Archives:**
    * Do **NOT** automatically compress folders or create `.zip` archives unless explicitly requested by the user. Keep tools maintained as clean, direct source directories and files within the workspace.
+
+6. **Keep C Source Code in `xp_setup_ui/` and Binaries in Tool Subfolders:**
+   * Only use `xp_setup_ui` when the user explicitly asks for a graphical Setup UI or controller-selectable menu. When used, place the compiled `xp_setup_ui` binary inside the tool's subfolder (`daemon/` or `app/`) and keep all `.c` source files in [`xp_setup_ui/`](file:///d:/me/r36h/tools/xp_setup_ui/).
+
+7. **Follow `playfe` Naming & Subfolder Hiding Rules in `/roms/tools/`:**
+   * **Stem-Matching Rule (Menu Tools):** For any tool that places a top-level launcher `.sh` in `/roms/tools/`, its subfolder name (`<tool_name>/`) normalized to lowercase alphanumeric (`[a-z0-9]`, length `> 4`) **MUST** be a substring of the top-level `.sh` filename stem so `playfe` automatically hides the subfolder from the menu (e.g., `/roms/tools/Screen_Off.sh` (`screenoff`) auto-hides `/roms/tools/screen_off/`; `/roms/tools/Start_Web_Terminal.sh` (`startwebterminal`) auto-hides `/roms/tools/web_terminal/`).
+   * **Dot-Prefix Rule (Non-Menu Folders):** Any subfolder inside `/roms/tools/` that contains `.sh` scripts and does **NOT** have a matching top-level `.sh` launcher in `/roms/tools/` must be prefixed with a dot (`.` e.g., `.power_button/`) if stored on the device without `gamelist.xml`, as `playfe` immediately skips any directory where `d_name[0] == '.'`.
 
 ---
 
@@ -330,5 +380,36 @@ Key technical findings and platform quirks discovered on physical R36H running p
   disown
   sleep 2
   ```
+
+### 5. playOS 4.0 Graphical Frontend (`playfe`) Menu & Cover Art Integration
+* **Frontend Service:** playOS 4.0 uses `/usr/local/bin/playfe` (managed by `playfe.service`), which reads `/etc/emulationstation/es_systems.cfg` and automatically matches cover art in `/roms/<system>/images/`.
+* **Enabling the `TOOLS` Category (`tools_menu`):** Run [`tools_menu/Install_Tools_Menu.sh`](file:///d:/me/r36h/tools/tools_menu/Install_Tools_Menu.sh) to register `<name>tools</name>` (with `<path>/roms/tools/</path>`, `<theme>tools</theme>`, `<command>sudo bash %ROM%</command>`) in `/etc/emulationstation/es_systems.cfg` and restart `playfe.service`. Built-in system icons (`/usr/local/share/playfe/logos/tools.png` and `tools-card.png`) are pre-installed on playOS.
+* **Cover Art (`512x512` PNG, Zero-`gamelist.xml`):** Each tool installer (`Install_<Tool>.sh`) only needs to copy `<ScriptStem>.sh` to `/roms/tools/` and `<ScriptStem>-thumb.png` to `/roms/tools/images/<ScriptStem>-thumb.png`. `playfe` automatically discovers both the script name and its cover art without requiring `gamelist.xml`.
+* **`playfe` Subdirectory Hiding Mechanics (`play::GamelistParser::scanDirectory` at `0x6df40`):**
+  1. **Rule 1 — Stem-Matching Auto-Skip (for `.sh` systems):**
+     * `playfe` normalizes every top-level `.sh` filename stem in `/roms/tools/` by stripping all non-alphanumeric characters and lowercasing (`[a-z0-9]`, must be `> 4` chars).
+     * When scanning subdirectories in `/roms/tools/`, `playfe` normalizes each subdirectory name the same way (`[a-z0-9]`, `> 4` chars). If the normalized subdirectory name is a **substring** of any top-level `.sh` stem, `playfe` **skips scanning that subdirectory completely**:
+
+     | Top-Level Script (`/roms/tools/`) | Normalized Stem | Subdirectory (`/roms/tools/`) | Normalized Dir | Result in `playfe` |
+     | :--- | :--- | :--- | :--- | :--- |
+     | `Screen_Off.sh` | `screenoff` | `screen_off/` | `screenoff` | **Auto-Hidden** (`screenoff` ⊆ `screenoff`) |
+     | `Start_Web_Terminal.sh` | `startwebterminal` | `web_terminal/` | `webterminal` | **Auto-Hidden** (`webterminal` ⊆ `startwebterminal`) |
+     | `Start_Web_FileManager.sh` | `startwebfilemanager` | `web_filemanager/` | `webfilemanager` | **Auto-Hidden** (`webfilemanager` ⊆ `startwebfilemanager`) |
+     | `Speedtest.sh` | `speedtest` | `speedtest/` | `speedtest` | **Auto-Hidden** (`speedtest` ⊆ `speedtest`) |
+     | *(Mismatch)* `Run_Net.sh` | `runnet` | `speedtest/` | `speedtest` | **NOT Hidden** (`speedtest` ⊈ `runnet` — leaks inner `.sh`!) |
+     | *(Too Short)* ` Tool.sh` | `tool` (≤ 4 chars) | `tool/` | `tool` (≤ 4 chars) | **NOT Hidden** (length must be `> 4` alphanumeric chars) |
+
+  2. **Rule 2 — Dot-Directory Immediate Skip (`d_name[0] == '.'`):**
+     * Any subdirectory starting with `.` (e.g., `.power_button/`, `.quick_tools/`, `.git/`) is skipped immediately at the `readdir` loop (`0x6e030`) even without a top-level `.sh` script.
+  3. **Rule 3 — Asset Folder Skip (No `.sh` inside):**
+     * Subdirectories that contain no `.sh` files (such as `/roms/tools/images/`) never appear in the menu because `scanDirectory` only adds files matching `<extension>` (`.sh .SH`).
+* **Launch Quirks (`stdin` & Button Release Debounce):** `playfe` runs scripts with `stdin` (`fd 0`) attached to `/dev/null` (so `read` subshells inside `wait -n` must append `|| sleep 86400`), and scripts that immediately listen for raw `/dev/input/event*` wake events must `sleep 0.6` first to ignore the `B` launch button release event.
+* **Full Reference:** See [`PLAYFE_MENU_GUIDE.md`](file:///d:/me/r36h/tools/PLAYFE_MENU_GUIDE.md) for the complete architecture and installer templates.
+
+### 6. `playOS Terminal` (`FindManager`) Output Buffering & Direct SDL2 KMSDRM UI
+* **How `FindManager` Runs Scripts:** The built-in `playOS Terminal` app (`/opt/FindManager_Data/FindManager`) executes scripts via `popen(cmd, "r")` in a background thread (`terminalWorker`), rendering only `"Running.."` via NanoVG/GLES2 at 60 FPS until the child process exits (`pclose`), and only then prints the collected `stdout` buffer as plain text (without ANSI escape code parsing).
+* **Why Text TUIs Cannot Render Live inside `FindManager`:** Writing to `stdout` is buffered until process exit, and writing to `/dev/tty1` is covered by `FindManager`'s GLES2 DRM surface.
+* **Standard Solution (`xp_setup_ui`):** When an interactive controller-driven UI is requested, freeze `FindManager|playfe` (`pkill -STOP -f "FindManager|playfe"`), launch [`xp_setup_ui`](file:///d:/me/r36h/tools/xp_setup_ui/xp_setup_ui) (which renders directly to KMSDRM via SDL2 and reads `/dev/input/event*` for D-Pad `544..547` and buttons `304`/`305`), print a plain-text summary to `stdout` on completion, and resume `FindManager|playfe` (`pkill -CONT -f "FindManager|playfe"`).
+
 
 

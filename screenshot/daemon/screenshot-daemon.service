@@ -1,0 +1,14 @@
+[Unit]
+Description=R36H Screenshot Hotkey Daemon (SELECT + Y)
+After=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /roms/tools/screenshot/daemon/screenshot_daemon.py
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

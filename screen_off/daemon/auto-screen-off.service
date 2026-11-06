@@ -1,0 +1,14 @@
+[Unit]
+Description=Auto Screen Off Daemon for R36H (playOS)
+After=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /usr/local/bin/auto_screen_off_daemon.py 60
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

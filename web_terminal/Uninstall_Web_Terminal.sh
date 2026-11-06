@@ -64,10 +64,12 @@ systemctl reset-failed 2>/dev/null || true
 print_msg "[3/4] กำลังลบโปรแกรม ttyd จาก /usr/local/bin..."
 rm -f /usr/local/bin/ttyd
 
-# 4. Remove menu shortcuts from /roms/tools
+# 4. Remove menu shortcuts & cover art from /roms/tools
 print_msg "[4/4] กำลังลบเมนูเครื่องมือใน /roms/tools..."
 rm -f /roms/tools/Start_Web_Terminal.sh
 rm -f /roms/tools/Stop_Web_Terminal.sh
+rm -f /roms/tools/images/Start_Web_Terminal-thumb.png
+rm -f /roms/tools/images/Stop_Web_Terminal-thumb.png
 
 print_msg ""
 print_msg "=========================================================="
