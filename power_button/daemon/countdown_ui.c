@@ -119,7 +119,7 @@ static void draw_char(SDL_Renderer *rend, int x, int y, char c, int scale) {
     for (int row = 0; row < 8; row++) {
         unsigned char bits = glyph[row];
         for (int col = 0; col < 8; col++) {
-            if (bits & (1 << col)) {
+            if (bits & (0x80 >> col)) {
                 SDL_Rect r = { x + col * scale, y + row * scale, scale, scale };
                 SDL_RenderFillRect(rend, &r);
             }
@@ -160,7 +160,7 @@ static void present_frame(SDL_Renderer *rend, SDL_Texture *canvas, int flip_h) {
 
 int main(int argc, char *argv[]) {
     int total_seconds = 3;
-    int flip_h = 1; /* Default to 1 (horizontal mirror correction for R36H display panel) */
+    int flip_h = 0; /* Default to 0 (normal left-to-right orientation) */
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--no-flip") == 0) {
