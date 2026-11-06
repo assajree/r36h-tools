@@ -1,0 +1,78 @@
+#!/bin/bash
+# ==============================================================================
+# Tool: Start Web File Manager (Filebrowser)
+# Target: R36H / playOS (ARM64)
+# ==============================================================================
+
+if [ "$(id -u)" -ne 0 ]; then
+    exec sudo -E "$0" "$@"
+fi
+
+print_msg() {
+    echo -e "$1"
+    if [ -w /dev/tty1 ]; then
+        echo -e "$1" > /dev/tty1 2>/dev/null || true
+    fi
+}
+
+clear > /dev/tty1 2>/dev/null || true
+
+print_msg "=================================================="
+print_msg "      Starting Web File Manager (Filebrowser)     "
+print_msg "=================================================="
+
+FB_BIN="/usr/local/bin/filebrowser"
+if [ ! -x "$FB_BIN" ]; then
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    if [ -x "${SCRIPT_DIR}/filebrowser" ]; then
+        FB_BIN="${SCRIPT_DIR}/filebrowser"
+    elif [ -x "/roms/tools/web_filemanager/filebrowser" ]; then
+        FB_BIN="/roms/tools/web_filemanager/filebrowser"
+    else
+        print_msg " [X] ไม่พบโปรแกรม filebrowser กรุณาติดตั้งก่อน"
+        sleep 5
+        exit 1
+    fi
+fi
+
+# ตรวจสอบ IP Wi-Fi
+IP_ADDR=$(ip -4 addr show wlan0 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -n 1)
+if [ -z "$IP_ADDR" ]; then
+    IP_ADDR=$(hostname -I 2>/dev/null | awk '{print $1}')
+fi
+
+# ตรวจสอบว่าโปรแกรมกำลังทำงานอยู่แล้วหรือไม่
+if pgrep -f "$FB_BIN" > /dev/null 2>&1; then
+    print_msg "\n [!] Web File Manager กำลังทำงานอยู่แล้ว"
+else
+    print_msg "\n [1/2] กำลังเปิดระบบ Web File Manager..."
+    ROOT_DIR="/roms"
+    [ ! -d "$ROOT_DIR" ] && ROOT_DIR="/"
+    DB_PATH="/usr/local/share/filebrowser.db"
+    mkdir -p "$(dirname "$DB_PATH")"
+    
+    nohup "$FB_BIN" --noauth -a 0.0.0.0 -p 8080 -r "$ROOT_DIR" -d "$DB_PATH" > /tmp/filebrowser.log 2>&1 &
+    sleep 2
+fi
+
+if pgrep -f "$FB_BIN" > /dev/null 2>&1; then
+    print_msg " [✓] เปิดระบบสำเร็จ!"
+    print_msg "=================================================="
+    if [ -n "$IP_ADDR" ]; then
+        print_msg " เปิดเว็บเบราว์เซอร์บนมือถือหรือคอมพิวเตอร์:"
+        print_msg " --> http://${IP_ADDR}:8080"
+    else
+        print_msg " [!] ยังไม่ได้เชื่อมต่อ Wi-Fi"
+        print_msg " เชื่อมต่อ Wi-Fi แล้วเข้าผ่าน IP:8080"
+    fi
+    print_msg "=================================================="
+    print_msg " - โฟลเดอร์: /roms (เกม, เซฟ, Tools)"
+    print_msg " - เข้าได้ทันที ไม่ต้องใส่รหัสผ่าน"
+    print_msg " - เมื่อใช้งานเสร็จ เลือก 'Stop Web File Manager'"
+    print_msg "=================================================="
+else
+    print_msg " [X] เกิดข้อผิดพลาดในการเริ่มระบบ ตรวจสอบ /tmp/filebrowser.log"
+fi
+
+print_msg "\nกำลังกลับสู่หน้ารายการเมนูใน 10 วินาที..."
+read -t 10 -n 1 -s -r 2>/dev/null || sleep 10

@@ -1,0 +1,12 @@
+# Force Unix LF line endings for scripts & configs so Linux/playOS never fails with \r
+*.sh text eol=lf
+*.rules text eol=lf
+*.service text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+.gitignore text eol=lf
+
+# Binary files
+*.ko binary
+*.bin binary
+filebrowser binary

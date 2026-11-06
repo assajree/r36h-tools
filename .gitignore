@@ -1,0 +1,12 @@
+# Archives & Release Artifacts
+*.zip
+*.tar.gz
+*.7z
+
+# OS Metadata
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Temporary & Log files
+*.log
