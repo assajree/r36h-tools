@@ -65,18 +65,19 @@
   3. **หากชื่อโฟลเดอร์ย่อยเป็นส่วนหนึ่ง (Substring) ของชื่อไฟล์ `.sh` ด้านนอก ตัว `playfe` จะข้ามการสแกนโฟลเดอร์ย่อยนั้นทันที!**
 * **ผลลัพธ์:** เครื่องมือที่เป็น **Archetype 1** (`Start_<Tool>.sh`) และ **Archetype 3** (`<Tool>.sh`) ที่มีสคริปต์รันวางอยู่ใน `/roms/tools/` จะไม่เกิดปัญหาสคริปต์ย่อยในโฟลเดอร์ `/roms/tools/<tool_name>/` โผล่ซ้ำในเมนู!
 
-### 3.3 กฎที่ 3: การซ่อนโฟลเดอร์ที่ไม่มีปุ่มกดในเมนูด้วย Dot-Prefix (`.folder`)
-* ตัว `playfe` ตรวจสอบ `if (d_name[0] == '.')` ที่ระดับ `readdir` (`0x6e030`) และข้ามทันที
-* ดังนั้น หากต้องการเก็บโฟลเดอร์ของเครื่องมือที่ **ไม่มี** สคริปต์ `.sh` วางอยู่ด้านนอก `/roms/tools/` (เช่น `power_button`, `quick_tools`, `tools_menu`) ไว้ใน `/roms/tools/` โดยไม่ใช้ `gamelist.xml` สามารถตั้งชื่อโฟลเดอร์นำหน้าด้วยจุด (เช่น `/roms/tools/.power_button/`) หรือระบุ `<hidden>true</hidden>` ใน `gamelist.xml` ได้
+### 3.3 กฎที่ 3: การซ่อนโฟลเดอร์ของเครื่องมือที่ไม่ต้องการแสดงไอคอนในเมนู (`<hidden>true</hidden>` ใน `gamelist.xml`)
+* เครื่องมือที่ไม่ต้องการให้มีไอคอนแสดงบนหน้าเมนู `TOOLS` (เช่น **Archetype 2: Background Daemons** อย่าง `power_button/` หรือ **Archetype 4: System Configuration** อย่าง `quick_tools/`, `tools_menu/`, `mercusys_wifi/`) จะไม่มีไฟล์ `.sh` ชื่อตรงกันวางอยู่ด้านนอก `/roms/tools/`
+* ส่งผลให้ `playfe` สแกนทะลุเข้าไปในโฟลเดอร์ย่อยและนำ `Install_*.sh` / `Uninstall_*.sh` ออกมาแสดงในเมนู
+* **กฎบังคับ:** สคริปต์ `Install_*.sh` ของเครื่องมือที่ไม่ต้องการแสดงไอคอนในเมนู `TOOLS` **ต้องมีสคริปต์อัปเดต `/roms/tools/gamelist.xml`** เพื่อใส่ `<hidden>true</hidden>` ให้กับไฟล์ `.sh` ทั้งหมดภายในโฟลเดอร์ของตัวเอง (`$SCRIPT_DIR`)
 
-| ไฟล์สคริปต์ด้านนอก (`/roms/tools/`) | ชื่อหลังแปลง (`> 4` ตัว) | โฟลเดอร์ย่อย (`/roms/tools/`) | ชื่อโฟลเดอร์หลังแปลง | ผลลัพธ์ในเมนู `playfe` |
+| ไฟล์สคริปต์ด้านนอก (`/roms/tools/`) | ชื่อหลังแปลง (`> 4` ตัว) | โฟลเดอร์ย่อย (`/roms/tools/`) | การตั้งค่า `gamelist.xml` | ผลลัพธ์ในเมนู `playfe` |
 | :--- | :--- | :--- | :--- | :--- |
-| `Screen_Off.sh` | `screenoff` | `screen_off/` | `screenoff` | **ซ่อนโฟลเดอร์ย่อยอัตโนมัติ** (`screenoff` ⊆ `screenoff`) |
-| `Start_Web_Terminal.sh` | `startwebterminal` | `web_terminal/` | `webterminal` | **ซ่อนโฟลเดอร์ย่อยอัตโนมัติ** (`webterminal` ⊆ `startwebterminal`) |
-| `Start_Web_FileManager.sh` | `startwebfilemanager` | `web_filemanager/` | `webfilemanager` | **ซ่อนโฟลเดอร์ย่อยอัตโนมัติ** (`webfilemanager` ⊆ `startwebfilemanager`) |
-| `Speedtest.sh` | `speedtest` | `speedtest/` | `speedtest` | **ซ่อนโฟลเดอร์ย่อยอัตโนมัติ** (`speedtest` ⊆ `speedtest`) |
-| *(ไม่มีสคริปต์ด้านนอก)* | — | `.power_button/` | *(ขึ้นต้นด้วย `.`)* | **ซ่อนโฟลเดอร์ย่อยอัตโนมัติ** (`d_name[0] == '.'`) |
-| *(ตั้งชื่อไม่ตรง)* `Run_Net.sh` | `runnet` | `speedtest/` | `speedtest` | **ไม่ซ่อน!** (`speedtest` ไม่อยู่ใน `runnet` สคริปต์ข้างในจะโผล่ซ้ำ) |
+| `Screen_Off.sh` | `screenoff` | `screen_off/` | ไม่ต้องใช้ | **แสดงเฉพาะปุ่มหลัก (ซ่อนโฟลเดอร์ย่อยอัตโนมัติ)** |
+| `Start_Web_Terminal.sh` | `startwebterminal` | `web_terminal/` | ไม่ต้องใช้ | **แสดงเฉพาะปุ่มหลัก (ซ่อนโฟลเดอร์ย่อยอัตโนมัติ)** |
+| `Start_Web_FileManager.sh` | `startwebfilemanager` | `web_filemanager/` | ไม่ต้องใช้ | **แสดงเฉพาะปุ่มหลัก (ซ่อนโฟลเดอร์ย่อยอัตโนมัติ)** |
+| `Speedtest.sh` | `speedtest` | `speedtest/` | ไม่ต้องใช้ | **แสดงเฉพาะปุ่มหลัก (ซ่อนโฟลเดอร์ย่อยอัตโนมัติ)** |
+| *(ไม่มีปุ่มด้านนอก)* | — | `power_button/`, `quick_tools/`, `tools_menu/`, `mercusys_wifi/` | ใส่ `<hidden>true</hidden>` ใน `Install_*.sh` | **ไม่แสดงไอคอนในเมนู `TOOLS`** |
+| *(ตั้งชื่อไม่ตรง)* `Run_Net.sh` | `runnet` | `speedtest/` | ไม่ได้ใส่ `<hidden>` | **ไม่ซ่อน!** (สคริปต์ในโฟลเดอร์ย่อยจะโผล่ซ้ำ) |
 
 ---
 
@@ -157,23 +158,56 @@ sh -c "( sudo bash '/roms/tools/My_Tool.sh' ) >> '/home/ark/.config/playfe/last_
 
 ---
 
-## 6. แนวทางการแบ่งหน้าที่ (Zero-`gamelist.xml` Architecture)
-
-เพื่อให้แต่ละโปรเจกต์คลีนและแยกหน้าที่กันอย่างชัดเจน:
+## 6. แนวทางการแบ่งหน้าที่สำหรับแต่ละประเภทเครื่องมือ
 
 1. **เปิดหมวดหมู่ `TOOLS` ด้วย `tools_menu` ([`tools_menu/Install_Tools_Menu.sh`](file:///d:/me/r36h/tools/tools_menu/Install_Tools_Menu.sh)):**
-   * มีหน้าที่เพียงเพิ่มบล็อก `<name>tools</name>` ลงใน `/etc/emulationstation/es_systems.cfg`, สร้างโฟลเดอร์ `/roms/tools/images/` และสั่ง `systemctl restart playfe.service`
-2. **การติดตั้งแอปแต่ละตัว (`Install_<Tool>.sh`):**
-   * ไม่จำเป็นต้องแก้ไข `gamelist.xml` หรือ `es_systems.cfg`
-   * เพียงคัดลอกสคริปต์ `.sh` ไปที่ `/roms/tools/<ScriptStem>.sh` และคัดลอกรูปปก `512x512` ไปที่ `/roms/tools/images/<ScriptStem>-thumb.png` ตัว `playfe` จะดึงชื่อแอปและรูปปกไปแสดงผลบนหน้าจอให้อัตโนมัติทันที:
+   * เพิ่มบล็อก `<name>tools</name>` ลงใน `/etc/emulationstation/es_systems.cfg`, สร้างโฟลเดอร์ `/roms/tools/images/`, ซ่อนไฟล์ `.sh` ในโฟลเดอร์ `tools_menu/` ของตัวเองใน `gamelist.xml` และสั่ง `systemctl restart playfe.service`
+2. **เครื่องมือที่ต้องการแสดงไอคอนในเมนู `TOOLS` (Archetype 1 & 3 เช่น `screen_off`, `speedtest`, `web_terminal`, `web_filemanager`):**
+   * ไม่ต้องแก้ไข `gamelist.xml` เพียงคัดลอกสคริปต์ `.sh` (ตั้งชื่อให้มีคำเดียวกับโฟลเดอร์ย่อย) ไปที่ `/roms/tools/<ScriptStem>.sh` และคัดลอกรูปปก `512x512` ไปที่ `/roms/tools/images/<ScriptStem>-thumb.png`:
+   ```bash
+   # แม่แบบใน Install_<Tool>.sh ของแอปที่แสดงไอคอนในเมนู TOOLS
+   mkdir -p /roms/tools/images
+   cp -f "$SCRIPT_DIR/app/My_Tool.sh" /roms/tools/My_Tool.sh
+   chmod 755 /roms/tools/My_Tool.sh
 
-```bash
-# แม่แบบใน Install_<Tool>.sh ของแต่ละแอป
-mkdir -p /roms/tools/images
-cp -f "$SCRIPT_DIR/app/My_Tool.sh" /roms/tools/My_Tool.sh
-chmod 755 /roms/tools/My_Tool.sh
-
-if [ -f "$SCRIPT_DIR/app/My_Tool-thumb.png" ]; then
-    cp -f "$SCRIPT_DIR/app/My_Tool-thumb.png" /roms/tools/images/My_Tool-thumb.png
-fi
-```
+   if [ -f "$SCRIPT_DIR/app/My_Tool-thumb.png" ]; then
+       cp -f "$SCRIPT_DIR/app/My_Tool-thumb.png" /roms/tools/images/My_Tool-thumb.png
+   fi
+   ```
+3. **เครื่องมือที่ไม่ต้องการให้แสดงไอคอนในเมนู `TOOLS` (Archetype 2 & 4 เช่น `power_button`, `quick_tools`, `tools_menu`, `mercusys_wifi`):**
+   * ให้ใส่สคริปต์อัปเดต `/roms/tools/gamelist.xml` ใน `Install_<Tool>.sh` เพื่อใส่ `<hidden>true</hidden>` ให้กับไฟล์ `.sh` ทั้งหมดในโฟลเดอร์ของตัวเอง (`$SCRIPT_DIR`):
+   ```bash
+   # แม่แบบใน Install_<Tool>.sh ของเครื่องมือที่ไม่ต้องการแสดงไอคอนในเมนู TOOLS
+   if command -v python3 >/dev/null 2>&1; then
+       SCRIPT_DIR="$SCRIPT_DIR" python3 - << 'PYEOF'
+   import os, xml.etree.ElementTree as ET
+   tools_dir = "/roms/tools"
+   script_dir = os.path.realpath(os.environ.get("SCRIPT_DIR", ""))
+   real_tools = os.path.realpath(tools_dir)
+   if os.path.isdir(tools_dir) and script_dir.startswith(real_tools + "/"):
+       gamelist_path = os.path.join(tools_dir, "gamelist.xml")
+       root = None
+       if os.path.exists(gamelist_path):
+           try: root = ET.parse(gamelist_path).getroot()
+           except Exception: root = None
+       if root is None: root = ET.Element("gameList")
+       existing = {g.find("path").text.strip().lstrip("./"): g for g in root.findall("game") if g.find("path") is not None and g.find("path").text}
+       for dp, _, fns in os.walk(script_dir):
+           for fn in sorted(fns):
+               if fn.lower().endswith(".sh"):
+                   rel_p = os.path.relpath(os.path.join(dp, fn), real_tools).replace("\\", "/")
+                   g = existing.get(rel_p)
+                   if g is None:
+                       g = ET.SubElement(root, "game")
+                       ET.SubElement(g, "path").text = "./" + rel_p
+                       ET.SubElement(g, "name").text = os.path.splitext(fn)[0]
+                   h = g.find("hidden")
+                   if h is None: h = ET.SubElement(g, "hidden")
+                   h.text = "true"
+       ET.indent(root, space="\t")
+       with open(gamelist_path, "w", encoding="utf-8", newline="\n") as f:
+           f.write('<?xml version="1.0"?>\n' + ET.tostring(root, encoding="unicode") + "\n")
+   PYEOF
+       chown ark:ark /roms/tools/gamelist.xml 2>/dev/null || true
+   fi
+   ```

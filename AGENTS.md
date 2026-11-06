@@ -261,8 +261,8 @@ When authoring, modifying, or packaging tools for playOS on R36H, AI agents **MU
    * Only use `xp_setup_ui` when the user explicitly asks for a graphical Setup UI or controller-selectable menu. When used, place the compiled `xp_setup_ui` binary inside the tool's subfolder (`daemon/` or `app/`) and keep all `.c` source files in [`xp_setup_ui/`](file:///d:/me/r36h/tools/xp_setup_ui/).
 
 7. **Follow `playfe` Naming & Subfolder Hiding Rules in `/roms/tools/`:**
-   * **Stem-Matching Rule (Menu Tools):** For any tool that places a top-level launcher `.sh` in `/roms/tools/`, its subfolder name (`<tool_name>/`) normalized to lowercase alphanumeric (`[a-z0-9]`, length `> 4`) **MUST** be a substring of the top-level `.sh` filename stem so `playfe` automatically hides the subfolder from the menu (e.g., `/roms/tools/Screen_Off.sh` (`screenoff`) auto-hides `/roms/tools/screen_off/`; `/roms/tools/Start_Web_Terminal.sh` (`startwebterminal`) auto-hides `/roms/tools/web_terminal/`).
-   * **Dot-Prefix Rule (Non-Menu Folders):** Any subfolder inside `/roms/tools/` that contains `.sh` scripts and does **NOT** have a matching top-level `.sh` launcher in `/roms/tools/` must be prefixed with a dot (`.` e.g., `.power_button/`) if stored on the device without `gamelist.xml`, as `playfe` immediately skips any directory where `d_name[0] == '.'`.
+   * **Stem-Matching Rule (Menu Tools — Archetypes 1 & 3):** For any tool that places a top-level launcher `.sh` in `/roms/tools/`, its subfolder name (`<tool_name>/`) normalized to lowercase alphanumeric (`[a-z0-9]`, length `> 4`) **MUST** be a substring of the top-level `.sh` filename stem so `playfe` automatically hides the subfolder from the menu (e.g., `/roms/tools/Screen_Off.sh` (`screenoff`) auto-hides `/roms/tools/screen_off/`; `/roms/tools/Start_Web_Terminal.sh` (`startwebterminal`) auto-hides `/roms/tools/web_terminal/`).
+   * **Non-Menu Tools Must Hide Their `.sh` Scripts in `/roms/tools/gamelist.xml` (Archetypes 2 & 4):** Any tool that does **NOT** want an icon displayed in the `TOOLS` menu (i.e. has no matching top-level `.sh` launcher in `/roms/tools/`, such as `power_button`, `quick_tools`, `tools_menu`, `mercusys_wifi`) **MUST** include a step in its `Install_*.sh` script to update `/roms/tools/gamelist.xml` and set `<hidden>true</hidden>` for all `.sh` files inside its own folder (`$SCRIPT_DIR`).
 
 ---
 
@@ -399,10 +399,45 @@ Key technical findings and platform quirks discovered on physical R36H running p
      | *(Mismatch)* `Run_Net.sh` | `runnet` | `speedtest/` | `speedtest` | **NOT Hidden** (`speedtest` ⊈ `runnet` — leaks inner `.sh`!) |
      | *(Too Short)* ` Tool.sh` | `tool` (≤ 4 chars) | `tool/` | `tool` (≤ 4 chars) | **NOT Hidden** (length must be `> 4` alphanumeric chars) |
 
-  2. **Rule 2 — Dot-Directory Immediate Skip (`d_name[0] == '.'`):**
-     * Any subdirectory starting with `.` (e.g., `.power_button/`, `.quick_tools/`, `.git/`) is skipped immediately at the `readdir` loop (`0x6e030`) even without a top-level `.sh` script.
-  3. **Rule 3 — Asset Folder Skip (No `.sh` inside):**
-     * Subdirectories that contain no `.sh` files (such as `/roms/tools/images/`) never appear in the menu because `scanDirectory` only adds files matching `<extension>` (`.sh .SH`).
+  2. **Rule 2 — Hiding Non-Menu Tools via `gamelist.xml` (`<hidden>true</hidden>`):**
+     * When a tool does **NOT** place a top-level `.sh` launcher in `/roms/tools/` (Archetype 2 Background Daemons & Archetype 4 System Configuration tools like `power_button/`, `quick_tools/`, `tools_menu/`, `mercusys_wifi/`), `playfe` will recurse into its subfolder and show its `Install_*.sh` / `Uninstall_*.sh` scripts in the `TOOLS` menu unless hidden.
+     * Therefore, every non-menu tool's `Install_*.sh` **MUST** run the standard `gamelist.xml` hiding snippet to mark all `.sh` files inside its own `$SCRIPT_DIR` as `<hidden>true</hidden>`:
+       ```bash
+       if command -v python3 >/dev/null 2>&1; then
+           SCRIPT_DIR="$SCRIPT_DIR" python3 - << 'PYEOF'
+       import os, xml.etree.ElementTree as ET
+       tools_dir = "/roms/tools"
+       script_dir = os.path.realpath(os.environ.get("SCRIPT_DIR", ""))
+       real_tools = os.path.realpath(tools_dir)
+       if os.path.isdir(tools_dir) and script_dir.startswith(real_tools + "/"):
+           gamelist_path = os.path.join(tools_dir, "gamelist.xml")
+           root = None
+           if os.path.exists(gamelist_path):
+               try: root = ET.parse(gamelist_path).getroot()
+               except Exception: root = None
+           if root is None: root = ET.Element("gameList")
+           existing = {g.find("path").text.strip().lstrip("./"): g for g in root.findall("game") if g.find("path") is not None and g.find("path").text}
+           for dp, _, fns in os.walk(script_dir):
+               for fn in sorted(fns):
+                   if fn.lower().endswith(".sh"):
+                       rel_p = os.path.relpath(os.path.join(dp, fn), real_tools).replace("\\", "/")
+                       g = existing.get(rel_p)
+                       if g is None:
+                           g = ET.SubElement(root, "game")
+                           ET.SubElement(g, "path").text = "./" + rel_p
+                           ET.SubElement(g, "name").text = os.path.splitext(fn)[0]
+                       h = g.find("hidden")
+                       if h is None: h = ET.SubElement(g, "hidden")
+                       h.text = "true"
+           ET.indent(root, space="\t")
+           with open(gamelist_path, "w", encoding="utf-8", newline="\n") as f:
+               f.write('<?xml version="1.0"?>\n' + ET.tostring(root, encoding="unicode") + "\n")
+       PYEOF
+           chown ark:ark /roms/tools/gamelist.xml 2>/dev/null || true
+       fi
+       ```
+  3. **Rule 3 — Dot-Directory (`d_name[0] == '.'`) & Asset Folder Skip (No `.sh` inside):**
+     * Any subdirectory starting with `.` is skipped immediately at the `readdir` loop (`0x6e030`), and subdirectories that contain no `.sh` files (such as `/roms/tools/images/`) never appear in the menu because `scanDirectory` only adds files matching `<extension>` (`.sh .SH`).
 * **Launch Quirks (`stdin` & Button Release Debounce):** `playfe` runs scripts with `stdin` (`fd 0`) attached to `/dev/null` (so `read` subshells inside `wait -n` must append `|| sleep 86400`), and scripts that immediately listen for raw `/dev/input/event*` wake events must `sleep 0.6` first to ignore the `B` launch button release event.
 * **Full Reference:** See [`PLAYFE_MENU_GUIDE.md`](file:///d:/me/r36h/tools/PLAYFE_MENU_GUIDE.md) for the complete architecture and installer templates.
 

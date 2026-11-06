@@ -55,7 +55,7 @@ All tools developed or maintained in this workspace **MUST** adhere strictly to 
       ├── <daemon_script>     <-- Python PMIC/evdev listener or daemon binary
       └── <tool>.service      <-- Systemd background service unit
   ```
-* **System Integration:** Running `Install_<Tool>.sh` registers the service into `/etc/systemd/system/`, enables it for boot-time autostart, and starts it immediately.
+* **System & `playfe` Integration:** Running `Install_<Tool>.sh` registers the service into `/etc/systemd/system/`, enables it for boot-time autostart, starts it immediately, and updates `/roms/tools/gamelist.xml` to mark all `.sh` files inside its own folder as `<hidden>true</hidden>` so they do not clutter the `TOOLS` menu on playOS.
 
 ---
 
@@ -89,4 +89,4 @@ All tools developed or maintained in this workspace **MUST** adhere strictly to 
   ├── Uninstall_<Tool>.sh     <-- Clean teardown script (reverts OS settings/mounts)
   └── README.txt              <-- User manual & documentation
   ```
-* **EmulationStation Integration:** None. These utilities are executed once from the terminal emulator or via remote SSH session. They keep the `/roms/tools/` menu uncluttered.
+* **EmulationStation / `playfe` Integration:** None (Hidden). These utilities are executed once from the terminal emulator or via remote SSH session. Their `Install_<Tool>.sh` script marks all `.sh` scripts in their own subfolder as `<hidden>true</hidden>` in `/roms/tools/gamelist.xml` so the `/roms/tools/` menu stays uncluttered.

@@ -124,6 +124,40 @@ fi
 udevadm control --reload-rules 2>/dev/null || true
 /usr/local/bin/bind_mercusys_wifi.sh
 udevadm trigger --action=change 2>/dev/null || true
+
+# 5.5 ซ่อนไฟล์ .sh ในโฟลเดอร์ mercusys_wifi ออกจากหน้าเมนู TOOLS บน playOS
+if command -v python3 >/dev/null 2>&1; then
+    SCRIPT_DIR="$SCRIPT_DIR" python3 - << 'PYEOF'
+import os, xml.etree.ElementTree as ET
+tools_dir = "/roms/tools"
+script_dir = os.path.realpath(os.environ.get("SCRIPT_DIR", ""))
+real_tools = os.path.realpath(tools_dir)
+if os.path.isdir(tools_dir) and script_dir.startswith(real_tools + "/"):
+    gamelist_path = os.path.join(tools_dir, "gamelist.xml")
+    root = None
+    if os.path.exists(gamelist_path):
+        try: root = ET.parse(gamelist_path).getroot()
+        except Exception: root = None
+    if root is None: root = ET.Element("gameList")
+    existing = {g.find("path").text.strip().lstrip("./"): g for g in root.findall("game") if g.find("path") is not None and g.find("path").text}
+    for dp, _, fns in os.walk(script_dir):
+        for fn in sorted(fns):
+            if fn.lower().endswith(".sh"):
+                rel_p = os.path.relpath(os.path.join(dp, fn), real_tools).replace("\\", "/")
+                g = existing.get(rel_p)
+                if g is None:
+                    g = ET.SubElement(root, "game")
+                    ET.SubElement(g, "path").text = "./" + rel_p
+                    ET.SubElement(g, "name").text = os.path.splitext(fn)[0]
+                h = g.find("hidden")
+                if h is None: h = ET.SubElement(g, "hidden")
+                h.text = "true"
+    ET.indent(root, space="\t")
+    with open(gamelist_path, "w", encoding="utf-8", newline="\n") as f:
+        f.write('<?xml version="1.0"?>\n' + ET.tostring(root, encoding="unicode") + "\n")
+PYEOF
+    chown ark:ark /roms/tools/gamelist.xml 2>/dev/null || true
+fi
 print_msg " [✓] บันทึก udev rule และ startup helper เรียบร้อย"
 
 # ------------------------------------------------------------------------------
