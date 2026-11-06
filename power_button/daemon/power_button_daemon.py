@@ -40,19 +40,6 @@ def clear_screen():
 
 def notify_screen(message):
     """Prints message directly to /dev/tty1 framebuffer console and stdout."""
-    # Ensure backlight is on so notification is visible
-    for b_path in glob.glob("/sys/class/backlight/*"):
-        b_file = os.path.join(b_path, "brightness")
-        if os.path.exists(b_file):
-            try:
-                with open(b_file, "r") as f:
-                    cur = int(f.read().strip())
-                if cur <= 10:
-                    with open(b_file, "w") as f:
-                        f.write("100\n")
-            except Exception:
-                pass
-
     formatted = f"\n\n\033[1;33m{message}\033[0m\n"
     print(formatted, flush=True)
     if os.path.exists("/dev/tty1"):
