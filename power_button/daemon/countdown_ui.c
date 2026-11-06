@@ -146,11 +146,31 @@ static void draw_centered_text(SDL_Renderer *rend, int center_x, int y, const ch
     draw_text(rend, center_x - (w / 2), y, str, scale, r, g, b);
 }
 
+static void present_frame(SDL_Renderer *rend, SDL_Texture *canvas, int flip_h) {
+    if (canvas) {
+        SDL_SetRenderTarget(rend, NULL);
+        if (flip_h) {
+            SDL_RenderCopyEx(rend, canvas, NULL, NULL, 0.0, NULL, SDL_FLIP_HORIZONTAL);
+        } else {
+            SDL_RenderCopy(rend, canvas, NULL, NULL);
+        }
+    }
+    SDL_RenderPresent(rend);
+}
+
 int main(int argc, char *argv[]) {
     int total_seconds = 3;
-    if (argc > 1) {
-        int s = atoi(argv[1]);
-        if (s > 0 && s <= 10) total_seconds = s;
+    int flip_h = 1; /* Default to 1 (horizontal mirror correction for R36H display panel) */
+
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--no-flip") == 0) {
+            flip_h = 0;
+        } else if (strcmp(argv[i], "--flip") == 0) {
+            flip_h = 1;
+        } else {
+            int s = atoi(argv[i]);
+            if (s > 0 && s <= 10) total_seconds = s;
+        }
     }
 
     /* Initialize SDL2 Video and Joystick */
@@ -179,9 +199,30 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
-    SDL_Renderer *rend = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    SDL_Renderer *rend = SDL_CreateRenderer(win, -1,
+                                            SDL_RENDERER_ACCELERATED |
+                                            SDL_RENDERER_PRESENTVSYNC |
+                                            SDL_RENDERER_TARGETTEXTURE);
+    if (!rend) {
+        rend = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    }
     if (!rend) {
         rend = SDL_CreateRenderer(win, -1, SDL_RENDERER_SOFTWARE);
+    }
+
+    /* Create target texture canvas for horizontal hardware flip */
+    SDL_Texture *canvas = NULL;
+    if (SDL_RenderTargetSupported(rend)) {
+        canvas = SDL_CreateTexture(rend,
+                                   SDL_PIXELFORMAT_RGBA8888,
+                                   SDL_TEXTUREACCESS_TARGET,
+                                   SCREEN_W, SCREEN_H);
+        if (!canvas) {
+            canvas = SDL_CreateTexture(rend,
+                                       SDL_PIXELFORMAT_ARGB8888,
+                                       SDL_TEXTUREACCESS_TARGET,
+                                       SCREEN_W, SCREEN_H);
+        }
     }
 
     Uint32 start_time = SDL_GetTicks();
@@ -220,6 +261,11 @@ int main(int argc, char *argv[]) {
 
         if (elapsed >= duration_ms) {
             break; /* Timer finished -> Proceed to shutdown */
+        }
+
+        /* Direct drawing onto canvas if available */
+        if (canvas) {
+            SDL_SetRenderTarget(rend, canvas);
         }
 
         /* 1. Backdrop Overlay */
@@ -306,7 +352,7 @@ int main(int argc, char *argv[]) {
 
         draw_centered_text(rend, 320, action_y + 10, "PRESS ANY BUTTON TO CANCEL", 2, 250, 250, 250);
 
-        SDL_RenderPresent(rend);
+        present_frame(rend, canvas, flip_h);
         SDL_Delay(16); /* ~60 FPS smooth animation */
     }
 
@@ -314,6 +360,10 @@ int main(int argc, char *argv[]) {
     if (cancelled) {
         /* Vibration confirmation of cancel */
         system("/usr/local/bin/sdl_rumble 2 100 >/dev/null 2>&1 &");
+
+        if (canvas) {
+            SDL_SetRenderTarget(rend, canvas);
+        }
 
         SDL_SetRenderDrawColor(rend, 10, 10, 14, 255);
         SDL_RenderClear(rend);
@@ -337,10 +387,14 @@ int main(int argc, char *argv[]) {
         draw_centered_text(rend, 320, 70 + 110, "SHUTDOWN CANCELLED", 3, 250, 250, 250);
         draw_centered_text(rend, 320, 70 + 190, "Returning to game...", 2, 161, 161, 170);
 
-        SDL_RenderPresent(rend);
+        present_frame(rend, canvas, flip_h);
         SDL_Delay(600); /* Show for 0.6s then clean exit */
     } else {
         /* Shutting down notice */
+        if (canvas) {
+            SDL_SetRenderTarget(rend, canvas);
+        }
+
         SDL_SetRenderDrawColor(rend, 10, 10, 14, 255);
         SDL_RenderClear(rend);
 
@@ -354,10 +408,11 @@ int main(int argc, char *argv[]) {
         draw_centered_text(rend, 320, 70 + 110, "SHUTTING DOWN...", 3, 250, 250, 250);
         draw_centered_text(rend, 320, 70 + 190, "Saving game and data...", 2, 161, 161, 170);
 
-        SDL_RenderPresent(rend);
+        present_frame(rend, canvas, flip_h);
         SDL_Delay(300);
     }
 
+    if (canvas) SDL_DestroyTexture(canvas);
     if (joy) SDL_JoystickClose(joy);
     SDL_DestroyRenderer(rend);
     SDL_DestroyWindow(win);

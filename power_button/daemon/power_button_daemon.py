@@ -92,6 +92,7 @@ def trigger_safe_shutdown():
 
     # 1. Gracefully terminate emulators so RetroArch flushes SRAM & save files
     emulators = [
+        "playfe",
         "retroarch",
         "PPSSPPDL",
         "ppsspp",
@@ -104,6 +105,13 @@ def trigger_safe_shutdown():
         "dosbox"
     ]
     emu_pattern = "|".join(emulators)
+
+    # First, make sure processes are resumed (SIGCONT) so they can process SIGTERM
+    try:
+        subprocess.run(["pkill", "-CONT", "-f", emu_pattern], timeout=2, capture_output=True)
+    except Exception:
+        pass
+
     try:
         subprocess.run(["pkill", "-SIGTERM", "-f", emu_pattern], timeout=3, capture_output=True)
     except Exception as e:
@@ -157,26 +165,41 @@ def countdown_and_shutdown(power_fd, power_dev_path):
     """
     log("1-second hold reached. Launching graphical countdown UI...")
 
+    # Freeze frontend & emulators so they stop swapping KMSDRM buffers (eliminates screen flicker)
+    pause_pattern = "playfe|retroarch|retroarch32|PPSSPPDL|ppsspp|mupen64plus|drastic|flycast"
+    try:
+        subprocess.run(["pkill", "-STOP", "-f", pause_pattern], timeout=2, capture_output=True)
+        log("Paused frontend / emulators (SIGSTOP to eliminate KMSDRM buffer flicker)")
+    except Exception as e:
+        log(f"Warning pausing processes: {e}")
+
     ui_bin = "/usr/local/bin/countdown_ui"
     if not os.path.exists(ui_bin):
         ui_bin = "/roms/tools/power_button/daemon/countdown_ui"
 
+    cancelled = False
     if os.path.exists(ui_bin):
         try:
             res = subprocess.run([ui_bin, str(COUNTDOWN_SECONDS)], timeout=COUNTDOWN_SECONDS + 2)
             if res.returncode == 0:
                 log("UI countdown completed. Proceeding with safe shutdown...")
-                trigger_safe_shutdown()
-                while True:
-                    time.sleep(10)
             else:
                 log("UI countdown CANCELLED by user button press.")
-                drain_inputs([power_fd])
-                return
+                cancelled = True
         except Exception as e:
             log(f"UI execution error: {e}")
 
-    # Fallback to direct shutdown if UI binary is not found
+    if cancelled:
+        # User pressed a button to cancel -> Wake frontend & emulators back up immediately
+        try:
+            subprocess.run(["pkill", "-CONT", "-f", pause_pattern], timeout=2, capture_output=True)
+            log("Resumed frontend / emulators (SIGCONT)")
+        except Exception as e:
+            log(f"Warning resuming processes: {e}")
+        drain_inputs([power_fd])
+        return
+
+    # Trigger graceful system shutdown
     trigger_safe_shutdown()
     while True:
         time.sleep(10)
