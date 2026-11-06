@@ -1,0 +1,14 @@
+[Unit]
+Description=Power Button Hold-to-Shutdown Daemon for R36H
+After=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /usr/local/bin/power_button_daemon.py
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -20,7 +20,9 @@ wait_for_exit() {
     
     # 1. Listen for keypress on stdin/tty1
     (
-        if [ -c /dev/tty1 ]; then
+        if [ -t 0 ]; then
+            read -s -n 1 -r 2>/dev/null
+        elif [ -c /dev/tty1 ]; then
             read -s -n 1 -r < /dev/tty1 2>/dev/null
         else
             read -s -n 1 -r 2>/dev/null
@@ -37,10 +39,14 @@ wait_for_exit() {
     done
     
     # Wait until ANY listener receives input
-    wait -n $INPUT_PIDS 2>/dev/null || wait $INPUT_PIDS 2>/dev/null || sleep 2
+    wait -n $INPUT_PIDS 2>/dev/null || sleep 2
     
     # Clean up all listeners
     kill -9 $INPUT_PIDS 2>/dev/null || true
+}
+
+is_running() {
+    pgrep -x "filebrowser" > /dev/null 2>&1
 }
 
 clear > /dev/tty1 2>/dev/null || true
@@ -52,13 +58,15 @@ print_msg "=================================================="
 FB_BIN="/usr/local/bin/filebrowser"
 if [ ! -x "$FB_BIN" ]; then
     SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-    if [ -x "${SCRIPT_DIR}/filebrowser" ]; then
+    if [ -f "${SCRIPT_DIR}/filebrowser" ]; then
+        chmod +x "${SCRIPT_DIR}/filebrowser" 2>/dev/null || true
         FB_BIN="${SCRIPT_DIR}/filebrowser"
-    elif [ -x "/roms/tools/web_filemanager/filebrowser" ]; then
+    elif [ -f "/roms/tools/web_filemanager/filebrowser" ]; then
+        chmod +x "/roms/tools/web_filemanager/filebrowser" 2>/dev/null || true
         FB_BIN="/roms/tools/web_filemanager/filebrowser"
     else
-        print_msg " [X] ไม่พบโปรแกรม filebrowser กรุณาติดตั้งก่อน"
-        sleep 5
+        print_msg " [X] ไม่พบโปรแกรม filebrowser กรุณาติดตั้งก่อน (รัน Install_Web_FileManager.sh)"
+        wait_for_exit
         exit 1
     fi
 fi
@@ -73,20 +81,33 @@ HOST_NAME=$(hostname 2>/dev/null)
 [ "$HOST_NAME" = "localhost" ] && HOST_NAME=""
 
 # ตรวจสอบว่าโปรแกรมกำลังทำงานอยู่แล้วหรือไม่
-if pgrep -f "$FB_BIN" > /dev/null 2>&1; then
-    print_msg "\n [!] Web File Manager กำลังทำงานอยู่แล้ว"
+if is_running; then
+    print_msg "\n [✓] Web File Manager กำลังทำงานอยู่แล้ว"
 else
     print_msg "\n [1/2] กำลังเปิดระบบ Web File Manager..."
     ROOT_DIR="/roms"
     [ ! -d "$ROOT_DIR" ] && ROOT_DIR="/"
-    DB_PATH="/usr/local/share/filebrowser.db"
-    mkdir -p "$(dirname "$DB_PATH")"
     
+    DB_PATH="/usr/local/share/filebrowser.db"
+    mkdir -p "$(dirname "$DB_PATH")" 2>/dev/null || true
+    if [ ! -w "$(dirname "$DB_PATH")" ]; then
+        DB_PATH="/tmp/filebrowser.db"
+    fi
+    
+    rm -f /tmp/filebrowser.log
+    
+    # กำหนดค่าไม่ใช้รหัสผ่าน (noauth) ในฐานข้อมูล filebrowser
+    if [ ! -f "$DB_PATH" ]; then
+        "$FB_BIN" config init -d "$DB_PATH" --auth.method=noauth -a 0.0.0.0 -p 80 -r "$ROOT_DIR" > /dev/null 2>&1 || true
+    fi
+    "$FB_BIN" config set -d "$DB_PATH" --auth.method=noauth -a 0.0.0.0 -p 80 -r "$ROOT_DIR" > /dev/null 2>&1 || true
+
     nohup "$FB_BIN" --noauth -a 0.0.0.0 -p 80 -r "$ROOT_DIR" -d "$DB_PATH" > /tmp/filebrowser.log 2>&1 &
+    disown
     sleep 2
 fi
 
-if pgrep -f "$FB_BIN" > /dev/null 2>&1; then
+if is_running; then
     clear > /dev/tty1 2>/dev/null || true
     print_msg "=================================================="
     print_msg "          WEB FILE MANAGER พร้อมใช้งาน!           "
@@ -116,6 +137,13 @@ if pgrep -f "$FB_BIN" > /dev/null 2>&1; then
     print_msg "=================================================="
     wait_for_exit
 else
-    print_msg " [X] เกิดข้อผิดพลาดในการเริ่มระบบ ตรวจสอบ /tmp/filebrowser.log"
-    sleep 5
+    print_msg " [X] เกิดข้อผิดพลาดในการเริ่มระบบ"
+    if [ -f /tmp/filebrowser.log ]; then
+        print_msg " \n--- รายละเอียดข้อผิดพลาด (/tmp/filebrowser.log) ---"
+        tail -n 10 /tmp/filebrowser.log | while IFS= read -r line; do
+            print_msg "  $line"
+        done
+        print_msg " --------------------------------------------------"
+    fi
+    wait_for_exit
 fi

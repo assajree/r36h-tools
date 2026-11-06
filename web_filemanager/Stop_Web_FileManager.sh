@@ -21,8 +21,13 @@ print_msg "=================================================="
 print_msg "      Stopping Web File Manager (Filebrowser)     "
 print_msg "=================================================="
 
-if pgrep -f "filebrowser" > /dev/null 2>&1; then
-    pkill -f "filebrowser" 2>/dev/null || true
+# ปิด systemd service (ถ้ามี)
+systemctl stop filebrowser.service 2>/dev/null || true
+
+# ปิด process filebrowser ทั้งหมด
+if pgrep -x "filebrowser" > /dev/null 2>&1 || pgrep -f "filebrowser" > /dev/null 2>&1; then
+    pkill -9 -x "filebrowser" 2>/dev/null || true
+    pkill -9 -f "filebrowser" 2>/dev/null || true
     sleep 1
     print_msg "\n [✓] ปิดการทำงาน Web File Manager สำเร็จ"
     print_msg " คืนแรม (RAM) ให้ระบบสำหรับเล่นเกมเรียบร้อย"

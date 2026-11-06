@@ -54,17 +54,42 @@ d:\me\r36h\tools\
 │   ├── Stop_Web_FileManager.sh      <-- Teardown script to reclaim RAM for games
 │   └── README.txt                    <-- User guide
 ├── web_terminal/                     <-- Wireless Web Terminal (ttyd)
-│   ├── ttyd                          <-- ARM64 standalone binary
 │   ├── Install_Web_Terminal.sh      <-- Setup script
-│   ├── Start_Web_Terminal.sh        <-- Launcher with on-screen IP display
-│   ├── Stop_Web_Terminal.sh         <-- Teardown script to reclaim RAM for games
-│   └── README.txt                    <-- User guide
+│   ├── Uninstall_Web_Terminal.sh    <-- Clean uninstaller script
+│   ├── README.txt                    <-- User guide
+│   └── app/                          <-- Internal application subfolder
+│       ├── ttyd                      <-- ARM64 standalone binary
+│       ├── Start_Web_Terminal.sh     <-- Launcher with on-screen IP display
+│       └── Stop_Web_Terminal.sh      <-- Teardown script to reclaim RAM for games
 ├── check_usb/                        <-- USB Hardware Diagnostics
 │   ├── check_usb.sh                 <-- lsusb & loaded module inspector
 │   └── check_usb_wait_power.sh      <-- Power / OTG diagnostic script
-├── speedtest/                        <-- Network Benchmark Utility
-│   ├── speedtest.sh                 <-- Runner script
-│   └── install_speedtest.sh         <-- Installation script
+├── speedtest/                        <-- Network Benchmark Utility (Ping/DL/UL)
+│   ├── speedtest.py                 <-- Bundled & patched speedtest CLI module
+│   ├── speedtest_runner.py          <-- Python UI runner & Thai display formatter
+│   ├── speedtest.sh                 <-- Dual-output launcher for EmulationStation & CLI
+│   ├── Install_Speedtest.sh         <-- Standalone installer for /roms/tools/ & PATH
+│   └── README.txt                   <-- User guide & instructions
+├── screenshot/                       <-- Framebuffer Screen Capture Utility
+│   ├── screenshot.sh                <-- Dual-output capture script (fbdev /dev/fb0)
+│   ├── Install_Screenshot.sh        <-- Standalone installer for /roms/tools/ & PATH
+│   └── README.txt                   <-- User guide & instructions
+├── quick_tools/                      <-- Top-level Shortcut Utility (00_tools)
+│   ├── Create_Quick_Tools.sh        <-- Dual-output launcher for /roms/tools/ & CLI
+│   ├── Install_Quick_Tools.sh       <-- Standalone installer for /roms/tools/
+│   └── README.txt                   <-- User guide & instructions
+├── screen_off/                       <-- Screen Preserver / Backlight Shutoff Utility
+│   ├── Screen_Off.sh                <-- Dual-output screen off & evdev wake launcher
+│   ├── Install_Screen_Off.sh        <-- Standalone installer for /roms/tools/ & PATH
+│   └── README.txt                   <-- User guide & instructions
+├── power_button/                     <-- Power Button Hold-to-Shutdown Daemon
+│   ├── Install_Power_Button.sh      <-- Standalone installer & service activator
+│   ├── Status_Power_Button.sh       <-- Status inspector (PID, RAM, device, logs)
+│   ├── Uninstall_Power_Button.sh    <-- Clean uninstaller & teardown script
+│   ├── README.txt                   <-- User guide & instructions
+│   └── daemon/                      <-- Internal daemon subfolder
+│       ├── power_button_daemon.py   <-- Python PMIC event listener (3s hold trigger)
+│       └── power-button-daemon.service <-- Systemd background service unit
 ├── rtl/                              <-- Realtek firmware repository (dArkOS origin)
 └── XNL RTL8188FTV/                   <-- Reference RTL8188FU driver archive
 ```
@@ -100,6 +125,62 @@ Every tool developed in this workspace must adhere to the **Dual-Execution Contr
 
 ---
 
+### 4.1 Standard Tool Archetypes & Directory Layouts
+
+To keep the user-facing workspace and `/roms/tools/` clean and intuitive, all tools developed or maintained in this workspace **MUST** adhere to one of three standardized directory archetypes based on their execution lifecycle:
+
+#### Archetype 1: On-Demand Service Tools (with Start / Stop)
+* **Use Case:** Services, web servers, or daemons that run on-demand (when started by the user) and provide a clean stop script to reclaim CPU/RAM before gaming (e.g. `web_terminal`, `web_filemanager`).
+* **Root Directory:** Contains only the setup, uninstall scripts, and user manual.
+* **Internal Subfolder (`app/`):** Houses binaries, core runtime files, and the `Start_*.sh` / `Stop_*.sh` scripts.
+* **Layout Structure:**
+  ```text
+  <tool_name>/
+  ├── Install_<Tool>.sh       <-- User setup script (copies Start/Stop to /roms/tools/)
+  ├── Uninstall_<Tool>.sh     <-- Clean uninstaller (removes services, binary, & shortcuts)
+  ├── README.txt              <-- User manual & documentation
+  └── app/                    <-- Internal application subfolder
+      ├── <binary_or_core>    <-- Standalone ARM64 binary or core assets
+      ├── Start_<Tool>.sh     <-- Launcher script with on-screen IP display
+      └── Stop_<Tool>.sh      <-- Teardown script to reclaim RAM for games
+  ```
+* **EmulationStation Integration:** Running `Install_<Tool>.sh` copies or symlinks `Start_<Tool>.sh` and `Stop_<Tool>.sh` directly to `/roms/tools/` so they appear as menu items in EmulationStation.
+
+#### Archetype 2: Background Daemon Tools (Always-On / System Service, No Start/Stop)
+* **Use Case:** Background system monitors, hardware button listeners, or battery/power hooks that run continuously as systemd services without requiring manual start/stop toggling (e.g. `power_button`).
+* **Root Directory:** Contains only setup, status inspector, clean uninstaller, and user manual.
+* **Internal Subfolder (`daemon/`):** Houses the daemon script/binary and the systemd unit file.
+* **Layout Structure:**
+  ```text
+  <tool_name>/
+  ├── Install_<Tool>.sh       <-- Setup script (registers and enables systemd service)
+  ├── Status_<Tool>.sh        <-- Status inspector (shows PID, RAM usage, hardware & logs)
+  ├── Uninstall_<Tool>.sh     <-- Clean uninstaller (stops, disables, & deletes service)
+  ├── README.txt              <-- User manual & documentation
+  └── daemon/                 <-- Internal daemon subfolder
+      ├── <daemon_script>     <-- Python PMIC/evdev listener or daemon binary
+      └── <tool>.service      <-- Systemd background service unit
+  ```
+* **System Integration:** Running `Install_<Tool>.sh` registers the service into `/etc/systemd/system/`, enables it for boot-time autostart, and starts it immediately.
+
+#### Archetype 3: One-Shot Utility Tools (Single-Run / No Daemon)
+* **Use Case:** Tools that perform an immediate task once and exit immediately, without leaving background processes (e.g. `screenshot`, `speedtest`, `quick_tools`).
+* **Root Directory:** Contains only setup/installer script, uninstaller (if system files or tools/PATH were modified), and user manual.
+* **Internal Subfolder (`app/`):** Houses runtime scripts, helper modules, or binaries.
+* **Layout Structure:**
+  ```text
+  <tool_name>/
+  ├── Install_<Tool>.sh       <-- Setup script (places menu launcher or PATH symlink)
+  ├── Uninstall_<Tool>.sh     <-- Optional uninstaller (removes installed launcher/shortcuts)
+  ├── README.txt              <-- User manual & documentation
+  └── app/                    <-- Internal application subfolder
+      ├── <tool_runner>.sh    <-- Dual-output execution runner
+      └── <modules_or_bin>    <-- Supporting scripts or libraries
+  ```
+* **EmulationStation Integration:** Running `Install_<Tool>.sh` copies or links the main execution script to `/roms/tools/` for single-click execution from the console menu.
+
+---
+
 ## 5. Universal Constraints & Rules for AI Agents
 
 When authoring, modifying, or packaging tools for playOS on R36H, AI agents **MUST** follow these rules:
@@ -127,3 +208,122 @@ When authoring, modifying, or packaging tools for playOS on R36H, AI agents **MU
 
 5. **Do Not Automatically Generate ZIP Archives:**
    * Do **NOT** automatically compress folders or create `.zip` archives unless explicitly requested by the user. Keep tools maintained as clean, direct source directories and files within the workspace.
+
+---
+
+## 6. Remote Testing & Deployment Workflow on R36H (SSH / SFTP)
+
+When live testing on physical hardware is requested, agents must follow this standardized 5-step lifecycle:
+
+```mermaid
+flowchart LR
+    A["1. Upload (SFTP)"] --> B["2. Setup (Install)"]
+    B --> C["3. Stop (Clean Teardown)"]
+    C --> D["4. Start & Verify Service"]
+    D --> E["5. Stop (Resource Reclaim)"]
+```
+
+### Testing Lifecycle Steps
+
+1. **Step 1: Upload (SFTP / SCP)**
+   * Target Host: `192.168.1.9` (Port: `22`, User: `ark`, Pass: `ark`)
+   * Transfer tool package to `/roms/tools/<tool_directory>/`
+   * Sync entrypoint shortcuts to `/roms/tools/`
+   * Ensure executable permissions: `chmod 755 /roms/tools/*.sh /roms/tools/<tool_directory>/*.sh`
+
+2. **Step 2: Setup / Installation (`Install_*.sh`)**
+   * Execute `sudo bash /roms/tools/<tool_directory>/Install_<Tool>.sh`
+   * Verify binary destination (e.g. `/usr/local/bin/<binary>`)
+   * Verify database / configuration initialization (e.g. `auth.method=noauth`)
+   * Verify systemd service registration (if applicable)
+
+3. **Step 3: Stop / Teardown Verification (`Stop_*.sh`)**
+   * Execute `sudo bash /roms/tools/Stop_<Tool>.sh`
+   * Check process table (`pgrep -x "<binary>"`) to confirm termination
+   * Verify target port is completely freed (no socket bind collisions)
+
+4. **Step 4: Start & Verification (`Start_*.sh`)**
+   * Execute `sudo bash /roms/tools/Start_<Tool>.sh < /dev/null`
+   * Verify process is running in background (obtain active PID)
+   * Verify on-screen text display (`/dev/tty1`) and IP address formatting
+   * Verify HTTP or socket connectivity (e.g. `GET http://<IP>:<Port>/` returns `200 OK` without authentication prompts)
+
+5. **Step 5: Clean Teardown**
+   * Re-run `Stop_<Tool>.sh` to verify repeatable cleanup and ensure 0% leftover CPU/RAM before emulator launch.
+
+### ⚠️ Execution Policy for Remote Testing
+* **On-Demand Only (Do NOT Test Automatically):**
+  * Agents must **NOT** automatically connect to the physical R36H or run SSH/SFTP deployment cycles on every code edit or turn.
+  * Live testing on hardware must be performed **ONLY** when the user explicitly instructs to test/deploy (or after design/scope alignment via `/grill-me`).
+
+---
+
+## 7. System Insights & Runtime Quirks (playOS Knowledge)
+
+Key technical findings and platform quirks discovered on physical R36H running playOS:
+
+### 1. Built-in `remote-autostart.service` & Port 80 Management
+* **Boot-time Service:** playOS ships with `/etc/systemd/system/remote-autostart.service` enabled by default. It automatically launches background services on system boot:
+  ```bash
+  ExecStart=/bin/bash -c "timedatectl set-ntp 1 & systemctl start smbd & systemctl start nmbd & systemctl start ssh.service & filebrowser -a 0.0.0.0 -p 80 -d /home/ark/.config/filebrowser.db -r / &"
+  ```
+* **Port 80 Collision:** Because `filebrowser` is already running on port 80 out of the box, any script that attempts to start a second instance without checking process status will fail immediately with:
+  `Error: listen tcp 0.0.0.0:80: bind: address already in use`
+* **Default Database & Credentials:** The system default database is `/home/ark/.config/filebrowser.db` (default auth: `ark:ark`, scope `/`). When configuring `noauth` or installing custom database instances (`/usr/local/share/filebrowser.db`), also apply `filebrowser config set -d /home/ark/.config/filebrowser.db --auth.method=noauth` so boot-time services adhere to the unauthenticated open-access policy.
+
+### 2. Process Matching Standard (`pgrep -x` vs `pgrep -f`)
+* **Short Name vs. Full Path:**
+  * When playOS starts binaries via shell commands (e.g., `filebrowser ...`), `/proc/<pid>/cmdline` contains the short command name, **not** `/usr/local/bin/filebrowser`.
+  * Using `pgrep -f "$BIN_PATH"` (e.g. `pgrep -f "/usr/local/bin/filebrowser"`) produces a **false negative**, causing launcher scripts to believe the daemon is stopped when it is actively running.
+  * Conversely, `pgrep -f "filebrowser"` can produce **false positives** by matching transient subshells or wrapper scripts that contain the string in their arguments.
+* **Standard Solution:** Always check daemon status with exact process name matching:
+  ```bash
+  is_running() {
+      pgrep -x "<binary_name>" > /dev/null 2>&1
+  }
+  ```
+
+### 3. Dual-Input Listener & Evdev Non-Blocking Loop (`wait_for_exit`)
+* **Terminal vs Framebuffer Detection:**
+  * Scripts running interactively via SSH have standard input (`stdin`) connected to a TTY (`[ -t 0 ]` is true).
+  * Scripts launched via EmulationStation execute on `/dev/tty1` and lack a keyboard, requiring gamepad input via `/dev/input/event*`.
+* **The `wait -n` EOF Hang Bug:**
+  * In earlier implementations: `wait -n $INPUT_PIDS || wait $INPUT_PIDS` was used.
+  * When executed non-interactively or when `stdin` reaches EOF (such as through piped inputs or subshells), `read` exits with code 1.
+  * Because the return code was non-zero, bash evaluated the fallback `|| wait $INPUT_PIDS` (without `-n`), which blocked indefinitely waiting for the persistent gamepad `dd` listeners.
+* **Standard Non-Blocking Pattern:**
+  ```bash
+  wait_for_exit() {
+      print_msg "\n  >>> กดปุ่มใดก็ได้บนเครื่อง หรือ คีย์บอร์ด เพื่อปิดหน้านี้ <<<"
+      (
+          if [ -t 0 ]; then
+              read -s -n 1 -r 2>/dev/null
+          elif [ -c /dev/tty1 ]; then
+              read -s -n 1 -r < /dev/tty1 2>/dev/null
+          else
+              read -s -n 1 -r 2>/dev/null
+          fi
+      ) &
+      INPUT_PIDS="$!"
+      for ev in /dev/input/event*; do
+          if [ -r "$ev" ]; then
+              ( dd if="$ev" of=/dev/null bs=16 count=1 2>/dev/null ) &
+              INPUT_PIDS="$INPUT_PIDS $!"
+          fi
+      done
+      wait -n $INPUT_PIDS 2>/dev/null || sleep 2
+      kill -9 $INPUT_PIDS 2>/dev/null || true
+  }
+  ```
+
+### 4. Background Daemon Detachment (`disown` Requirement)
+* When launcher scripts start daemons via `nohup <binary> <args> > /tmp/<log> 2>&1 &`, the process remains linked to the script's job table in bash.
+* If the launcher script exits or is interrupted by EmulationStation, the child daemon may receive `SIGHUP` or `SIGTERM` if the subshell process group is cleaned up.
+* **Standard Pattern:** Always invoke `disown` immediately after backgrounding long-running daemons:
+  ```bash
+  nohup "$BIN" <args> > /tmp/<tool>.log 2>&1 &
+  disown
+  sleep 2
+  ```
+
+

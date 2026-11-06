@@ -20,7 +20,9 @@ wait_for_exit() {
     
     # 1. Listen for keypress on stdin/tty1
     (
-        if [ -c /dev/tty1 ]; then
+        if [ -t 0 ]; then
+            read -s -n 1 -r 2>/dev/null
+        elif [ -c /dev/tty1 ]; then
             read -s -n 1 -r < /dev/tty1 2>/dev/null
         else
             read -s -n 1 -r 2>/dev/null
@@ -37,10 +39,14 @@ wait_for_exit() {
     done
     
     # Wait until ANY listener receives input
-    wait -n $INPUT_PIDS 2>/dev/null || wait $INPUT_PIDS 2>/dev/null || sleep 2
+    wait -n $INPUT_PIDS 2>/dev/null || sleep 2
     
     # Clean up all listeners
     kill -9 $INPUT_PIDS 2>/dev/null || true
+}
+
+is_running() {
+    pgrep -x "ttyd" > /dev/null 2>&1
 }
 
 clear > /dev/tty1 2>/dev/null || true
@@ -52,13 +58,21 @@ print_msg "=================================================="
 TTYD_BIN="/usr/local/bin/ttyd"
 if [ ! -x "$TTYD_BIN" ]; then
     SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-    if [ -x "${SCRIPT_DIR}/ttyd" ]; then
+    if [ -f "${SCRIPT_DIR}/ttyd" ]; then
+        chmod +x "${SCRIPT_DIR}/ttyd" 2>/dev/null || true
         TTYD_BIN="${SCRIPT_DIR}/ttyd"
-    elif [ -x "/roms/tools/web_terminal/ttyd" ]; then
+    elif [ -f "${SCRIPT_DIR}/app/ttyd" ]; then
+        chmod +x "${SCRIPT_DIR}/app/ttyd" 2>/dev/null || true
+        TTYD_BIN="${SCRIPT_DIR}/app/ttyd"
+    elif [ -f "/roms/tools/web_terminal/app/ttyd" ]; then
+        chmod +x "/roms/tools/web_terminal/app/ttyd" 2>/dev/null || true
+        TTYD_BIN="/roms/tools/web_terminal/app/ttyd"
+    elif [ -f "/roms/tools/web_terminal/ttyd" ]; then
+        chmod +x "/roms/tools/web_terminal/ttyd" 2>/dev/null || true
         TTYD_BIN="/roms/tools/web_terminal/ttyd"
     else
-        print_msg " [X] ไม่พบโปรแกรม ttyd กรุณาติดตั้งก่อน"
-        sleep 5
+        print_msg " [X] ไม่พบโปรแกรม ttyd กรุณาติดตั้งก่อน (รัน Install_Web_Terminal.sh)"
+        wait_for_exit
         exit 1
     fi
 fi
@@ -73,19 +87,21 @@ HOST_NAME=$(hostname 2>/dev/null)
 [ "$HOST_NAME" = "localhost" ] && HOST_NAME=""
 
 # ตรวจสอบว่าโปรแกรมกำลังทำงานอยู่แล้วหรือไม่
-if pgrep -f "$TTYD_BIN" > /dev/null 2>&1; then
-    print_msg "\n [!] Web Terminal กำลังทำงานอยู่แล้ว"
+if is_running; then
+    print_msg "\n [✓] Web Terminal กำลังทำงานอยู่แล้ว"
 else
     print_msg "\n [1/2] กำลังเปิดระบบ Web Terminal..."
     ROOT_DIR="/roms"
     [ ! -d "$ROOT_DIR" ] && ROOT_DIR="/"
     
+    rm -f /tmp/ttyd.log
     cd "$ROOT_DIR" || cd /
     nohup "$TTYD_BIN" -W -p 7681 -i 0.0.0.0 /bin/bash > /tmp/ttyd.log 2>&1 &
+    disown
     sleep 2
 fi
 
-if pgrep -f "$TTYD_BIN" > /dev/null 2>&1; then
+if is_running; then
     clear > /dev/tty1 2>/dev/null || true
     print_msg "=================================================="
     print_msg "            WEB TERMINAL พร้อมใช้งาน!             "
@@ -115,6 +131,13 @@ if pgrep -f "$TTYD_BIN" > /dev/null 2>&1; then
     print_msg "=================================================="
     wait_for_exit
 else
-    print_msg " [X] เกิดข้อผิดพลาดในการเริ่มระบบ ตรวจสอบ /tmp/ttyd.log"
-    sleep 5
+    print_msg " [X] เกิดข้อผิดพลาดในการเริ่มระบบ"
+    if [ -f /tmp/ttyd.log ]; then
+        print_msg " \n--- รายละเอียดข้อผิดพลาด (/tmp/ttyd.log) ---"
+        tail -n 10 /tmp/ttyd.log | while IFS= read -r line; do
+            print_msg "  $line"
+        done
+        print_msg " -------------------------------------------"
+    fi
+    wait_for_exit
 fi

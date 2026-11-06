@@ -10,3 +10,8 @@ Desktop.ini
 
 # Temporary & Log files
 *.log
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class

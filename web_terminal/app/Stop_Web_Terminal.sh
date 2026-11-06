@@ -21,8 +21,13 @@ print_msg "=================================================="
 print_msg "         Stopping Web Terminal (ttyd)             "
 print_msg "=================================================="
 
-if pgrep -f "ttyd" > /dev/null 2>&1; then
-    pkill -f "ttyd" 2>/dev/null || true
+# ปิด systemd service (ถ้ามี)
+systemctl stop ttyd.service 2>/dev/null || true
+
+# ปิด process ttyd ทั้งหมด
+if pgrep -x "ttyd" > /dev/null 2>&1 || pgrep -f "ttyd" > /dev/null 2>&1; then
+    pkill -9 -x "ttyd" 2>/dev/null || true
+    pkill -9 -f "ttyd" 2>/dev/null || true
     sleep 1
     print_msg "\n [✓] ปิดการทำงาน Web Terminal สำเร็จ"
     print_msg " คืนแรม (RAM) ให้ระบบสำหรับเล่นเกมเรียบร้อย"
