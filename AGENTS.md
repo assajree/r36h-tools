@@ -124,3 +124,6 @@ When authoring, modifying, or packaging tools for playOS on R36H, AI agents **MU
 4. **Preserve Subdirectory Modular Documentation:**
    * Keep `AGENTS.md` clean and focused on general environment specifications, architecture, and coding standards.
    * Place tool-specific configuration manuals, wiring/chipset notes, or driver quirks inside the respective tool folder.
+
+5. **Do Not Automatically Generate ZIP Archives:**
+   * Do **NOT** automatically compress folders or create `.zip` archives unless explicitly requested by the user. Keep tools maintained as clean, direct source directories and files within the workspace.
