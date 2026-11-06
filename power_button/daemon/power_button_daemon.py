@@ -147,21 +147,24 @@ def trigger_safe_shutdown():
         # Fallback to direct poweroff
         subprocess.run(["poweroff", "-f"])
 
-def flush_events(fd, event_size=24):
-    """Flushes queued events (e.g. key release or resume events)."""
-    while True:
-        r, _, _ = select.select([fd], [], [], 0.05)
-        if not r:
-            break
-        try:
-            os.read(fd, event_size)
-        except Exception:
-            break
+def drain_inputs(fds):
+    """Drains all buffered data from input descriptors without blocking."""
+    for fd in fds:
+        while True:
+            r, _, _ = select.select([fd], [], [], 0)
+            if not r:
+                break
+            try:
+                data = os.read(fd, 24)
+                if not data:
+                    break
+            except Exception:
+                break
 
 def countdown_and_shutdown(power_fd, power_dev_path):
     """
     Displays a 3-second countdown on /dev/tty1.
-    If ANY button is pressed on any input device during this period,
+    If ANY button is pressed on gamepad/keys during this period,
     cancellation is triggered and the system returns to normal.
     """
     log("1-second hold reached. Starting 3-second cancellation countdown...")
@@ -180,20 +183,14 @@ def countdown_and_shutdown(power_fd, power_dev_path):
         except Exception:
             pass
 
-    # 2. Flush any pending inputs so stale button presses don't cancel immediately
-    for ofd in other_fds + [power_fd]:
-        try:
-            while True:
-                d = os.read(ofd, 24)
-                if len(d) < 24:
-                    break
-        except Exception:
-            pass
+    # 2. Drain any pending events completely non-blocking
+    drain_inputs(other_fds)
 
     cancelled = False
 
     try:
         for remaining in range(COUNTDOWN_SECONDS, 0, -1):
+            log(f"Countdown: {remaining}s remaining...")
             notify_screen(
                 "============================================================\n"
                 f"             กำลังจะปิดเครื่องใน {remaining} วินาที...\n"
@@ -204,21 +201,28 @@ def countdown_and_shutdown(power_fd, power_dev_path):
             step_deadline = time.monotonic() + 1.0
             while time.monotonic() < step_deadline:
                 wait_sec = max(0.01, step_deadline - time.monotonic())
-                # Check other devices AND power_fd
-                r, _, _ = select.select(other_fds + [power_fd], [], [], min(0.05, wait_sec))
-                if r:
-                    for ready_fd in r:
-                        try:
-                            data = os.read(ready_fd, 24)
-                            if len(data) >= 24:
-                                sec, usec, etype, code, val = struct.unpack("qqHHi", data)
-                                # EV_KEY press (val == 1) cancels! (val == 0 is release, val == 2 is repeat)
-                                if etype == EV_KEY and val == 1:
-                                    log(f"Cancellation button detected (code {code})")
-                                    cancelled = True
-                                    break
-                        except Exception:
-                            pass
+                if other_fds:
+                    r, _, _ = select.select(other_fds, [], [], min(0.05, wait_sec))
+                    if r:
+                        for ready_fd in r:
+                            try:
+                                while True:
+                                    data = os.read(ready_fd, 24)
+                                    if len(data) < 24:
+                                        break
+                                    sec, usec, etype, code, val = struct.unpack("qqHHi", data)
+                                    # Any EV_KEY press (val == 1) cancels!
+                                    if etype == EV_KEY and val == 1:
+                                        log(f"Cancellation button detected (code {code}) on fd {ready_fd}")
+                                        cancelled = True
+                                        break
+                            except Exception:
+                                pass
+                            if cancelled:
+                                break
+                else:
+                    time.sleep(min(0.05, wait_sec))
+
                 if cancelled:
                     break
             if cancelled:
@@ -234,9 +238,8 @@ def countdown_and_shutdown(power_fd, power_dev_path):
             )
             time.sleep(1.0)
             clear_screen()
-            # Flush events before returning to normal loop
-            for ofd in other_fds + [power_fd]:
-                flush_events(ofd, 24)
+            drain_inputs(other_fds)
+            drain_inputs([power_fd])
             return
 
         # Countdown expired without cancellation -> Proceed with safe shutdown!
@@ -261,7 +264,8 @@ def run_loop():
     log(f"Listening for power button events on {dev_path} (Hold {HOLD_SECONDS}s for 3s countdown)")
 
     try:
-        fd = os.open(dev_path, os.O_RDONLY)
+        # Open in non-blocking mode to guarantee read will never hang the process
+        fd = os.open(dev_path, os.O_RDONLY | os.O_NONBLOCK)
     except Exception as e:
         log(f"Cannot open {dev_path}: {e}. Retrying in 5s...")
         time.sleep(5)
@@ -303,6 +307,8 @@ def run_loop():
 
             try:
                 data = os.read(fd, EVENT_SIZE)
+            except (BlockingIOError, InterruptedError):
+                continue
             except Exception as e:
                 log(f"Read error: {e}")
                 break
@@ -331,7 +337,7 @@ def run_loop():
                                 log(f"Suspend error: {e}")
                             log("System resumed from sleep.")
                             time.sleep(0.5)
-                            flush_events(fd, EVENT_SIZE)
+                            drain_inputs([fd])
                 elif val == 2:
                     # Key autorepeat while held
                     pass
