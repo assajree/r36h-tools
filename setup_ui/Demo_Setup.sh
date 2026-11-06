@@ -1,7 +1,7 @@
 #!/bin/bash
 # ==============================================================================
 # Tool: Universal Setup UI Engine - Demo & Template Script
-# Description: Copy xp_setup_ui (binary) into your tool's app/ or daemon/
+# Description: Copy setup_ui (binary) into your tool's app/ or daemon/
 #              subfolder, then customize the inline config block below.
 # ==============================================================================
 
@@ -12,26 +12,32 @@ fi
 
 export SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# Locate xp_setup_ui binary (supports current folder, daemon/, or app/)
-if [ -x "$SCRIPT_DIR/xp_setup_ui" ]; then
+# Locate setup_ui binary (supports current folder, daemon/, or app/)
+if [ -x "$SCRIPT_DIR/setup_ui" ]; then
+    UI_BIN="$SCRIPT_DIR/setup_ui"
+elif [ -x "$SCRIPT_DIR/daemon/setup_ui" ]; then
+    UI_BIN="$SCRIPT_DIR/daemon/setup_ui"
+elif [ -x "$SCRIPT_DIR/app/setup_ui" ]; then
+    UI_BIN="$SCRIPT_DIR/app/setup_ui"
+elif [ -x "$SCRIPT_DIR/xp_setup_ui" ]; then
     UI_BIN="$SCRIPT_DIR/xp_setup_ui"
 elif [ -x "$SCRIPT_DIR/daemon/xp_setup_ui" ]; then
     UI_BIN="$SCRIPT_DIR/daemon/xp_setup_ui"
 elif [ -x "$SCRIPT_DIR/app/xp_setup_ui" ]; then
     UI_BIN="$SCRIPT_DIR/app/xp_setup_ui"
 else
-    echo "[!] Error: xp_setup_ui binary not found."
+    echo "[!] Error: setup_ui binary not found."
     exit 1
 fi
 
 # Always resume playfe / FindManager when script exits
 cleanup_resume() {
-    pkill -CONT -f "FindManager|playfe" 2>/dev/null || true
+    killall -CONT FindManager playfe 2>/dev/null || true
 }
 trap cleanup_resume EXIT INT TERM
 
 # Pause playfe / FindManager so KMSDRM screen doesn't flicker
-pkill -STOP -f "FindManager|playfe" 2>/dev/null || true
+killall -STOP FindManager playfe 2>/dev/null || true
 
 # ==============================================================================
 # Custom Wizard Configuration
@@ -97,5 +103,5 @@ complete_title = Uninstall Complete
 complete_line = My Custom Tool has been removed.
 EOF
 
-pkill -CONT -f "FindManager|playfe" 2>/dev/null || true
+killall -CONT FindManager playfe 2>/dev/null || true
 exit 0

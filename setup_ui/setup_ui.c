@@ -1,16 +1,16 @@
 /*
- * Universal Windows XP Setup Wizard Engine (xp_setup_ui)
- * Target: R36H Handheld Console (playOS / RK3326 ARM64)
- * Rendering: Direct SDL2 KMSDRM (640x480 @ 60FPS)
+ * setup_ui.c - Universal ncurses-style Dialog Setup UI Engine (Direct SDL2 KMSDRM)
  *
- * Layout & Interaction Model:
- *   - Top-Left: Header + "============="
- *   - Body: Step Name + "[X] Option 1..N" + 1-line yellow description
- *   - Bottom Action Row: [ OK ]  [ Back ]  [ Exit ]
- *   - Controls:
- *       * D-Pad UP / DOWN    : Select Option ([X])
- *       * D-Pad LEFT / RIGHT : Select Action Button ([OK] / [Back] / [Exit])
- *       * Button A or B      : Execute the highlighted Action Button
+ * Renders an authentic Linux ncurses `dialog` TUI (blue backdrop, 3D raised gray
+ * dialog window with black drop shadow, centered title, 3D sunken option list box,
+ * 3D gauge progress bar, and < OK > < Back > < Exit > buttons) directly to the
+ * R36H KMSDRM display via SDL2 so it works 100% inside both EmulationStation
+ * (TOOLS menu) and playOS Terminal (FindManager).
+ *
+ * Controls (Hardware Gamepad + Keyboard):
+ *   - D-Pad UP / DOWN (or Analog Y)    : Highlight Option ([X] Option 1..N)
+ *   - D-Pad LEFT / RIGHT (or Analog X) : Highlight Action Button (< OK > / < Back > / < Exit >)
+ *   - Button A OR Button B (or Enter)  : Trigger Focused Action Button
  */
 
 #include <SDL2/SDL.h>
@@ -26,54 +26,173 @@
 #define SCREEN_W 640
 #define SCREEN_H 480
 
-/* Palette matching the custom Windows XP Setup Blue Mockup */
-#define BG_BLUE_R     42
-#define BG_BLUE_G     54
-#define BG_BLUE_B     206
+/* Authentic Linux ncurses `dialog` Color Palette */
+#define BG_SCREEN_R  0
+#define BG_SCREEN_G  68
+#define BG_SCREEN_B  170
 
-#define HL_BLUE_R     26
-#define HL_BLUE_G     34
-#define HL_BLUE_B     145
+#define DLG_GRAY_R   184
+#define DLG_GRAY_G   188
+#define DLG_GRAY_B   194
 
-#define FG_WHITE_R    255
-#define FG_WHITE_G    255
-#define FG_WHITE_B    255
+#define DLG_LIGHT_R  250
+#define DLG_LIGHT_G  252
+#define DLG_LIGHT_B  255
 
-#define FG_YELLOW_R   255
-#define FG_YELLOW_G   235
-#define FG_YELLOW_B   59
+#define DLG_DARK_R   58
+#define DLG_DARK_G   62
+#define DLG_DARK_B   68
 
-#define FG_DESC_R     255
-#define FG_DESC_G     230
-#define FG_DESC_B     140
+#define SHADOW_R     0
+#define SHADOW_G     0
+#define SHADOW_B     0
 
-#define FG_MUTED_R    115
-#define FG_MUTED_G    128
-#define FG_MUTED_B    220
+#define HL_NAVY_R    0
+#define HL_NAVY_G    52
+#define HL_NAVY_B    168
 
-#define BAR_GRAY_R    170
-#define BAR_GRAY_G    170
-#define BAR_GRAY_B    170
+#define FG_WHITE_R   255
+#define FG_WHITE_G   255
+#define FG_WHITE_B   255
 
-/* Limits for Universal Wizard Config */
-#define MAX_PAGES       16
-#define MAX_OPTIONS     8
-#define MAX_PROGRESS    8
-#define MAX_STEPS       16
-#define MAX_COMP_LINES  8
-#define MAX_STR         160
-#define MAX_CMD         1024
+#define FG_BLACK_R   18
+#define FG_BLACK_G   20
+#define FG_BLACK_B   24
+
+#define FG_NAVY_R    0
+#define FG_NAVY_G    42
+#define FG_NAVY_B    150
+
+#define FG_YELLOW_R  255
+#define FG_YELLOW_G  238
+#define FG_YELLOW_B  58
+
+#define FG_CYAN_R    130
+#define FG_CYAN_G    235
+#define FG_CYAN_B    255
+
+#define FG_MUTED_R   122
+#define FG_MUTED_G   126
+#define FG_MUTED_B   132
+
+/* Standard 8x8 ASCII bitmap font (32..126) */
+static const unsigned char font8x8_basic[95][8] = {
+    {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00}, /* 32 ' ' */
+    {0x18,0x3C,0x3C,0x18,0x18,0x00,0x18,0x00}, /* 33 '!' */
+    {0x36,0x36,0x00,0x00,0x00,0x00,0x00,0x00}, /* 34 '"' */
+    {0x36,0x36,0x7F,0x36,0x7F,0x36,0x36,0x00}, /* 35 '#' */
+    {0x0C,0x3E,0x03,0x1E,0x30,0x1F,0x0C,0x00}, /* 36 '$' */
+    {0x00,0x63,0x33,0x18,0x0C,0x66,0x63,0x00}, /* 37 '%' */
+    {0x1C,0x36,0x1C,0x6E,0x3B,0x33,0x6E,0x00}, /* 38 '&' */
+    {0x06,0x06,0x03,0x00,0x00,0x00,0x00,0x00}, /* 39 ''' */
+    {0x18,0x0C,0x06,0x06,0x06,0x0C,0x18,0x00}, /* 40 '(' */
+    {0x06,0x0C,0x18,0x18,0x18,0x0C,0x06,0x00}, /* 41 ')' */
+    {0x00,0x66,0x3C,0xFF,0x3C,0x66,0x00,0x00}, /* 42 '*' */
+    {0x00,0x0C,0x0C,0x3F,0x0C,0x0C,0x00,0x00}, /* 43 '+' */
+    {0x00,0x00,0x00,0x00,0x00,0x0C,0x0C,0x06}, /* 44 ',' */
+    {0x00,0x00,0x00,0x3F,0x00,0x00,0x00,0x00}, /* 45 '-' */
+    {0x00,0x00,0x00,0x00,0x00,0x0C,0x0C,0x00}, /* 46 '.' */
+    {0x60,0x30,0x18,0x0C,0x06,0x03,0x01,0x00}, /* 47 '/' */
+    {0x3E,0x63,0x73,0x7B,0x6F,0x67,0x3E,0x00}, /* 48 '0' */
+    {0x0C,0x0E,0x0C,0x0C,0x0C,0x0C,0x3F,0x00}, /* 49 '1' */
+    {0x1E,0x33,0x30,0x1C,0x06,0x33,0x3F,0x00}, /* 50 '2' */
+    {0x1E,0x33,0x30,0x1C,0x30,0x33,0x1E,0x00}, /* 51 '3' */
+    {0x38,0x3C,0x36,0x33,0x7F,0x30,0x78,0x00}, /* 52 '4' */
+    {0x3F,0x03,0x1F,0x30,0x30,0x33,0x1E,0x00}, /* 53 '5' */
+    {0x1C,0x06,0x03,0x1F,0x33,0x33,0x1E,0x00}, /* 54 '6' */
+    {0x3F,0x33,0x30,0x18,0x0C,0x0C,0x0C,0x00}, /* 55 '7' */
+    {0x1E,0x33,0x33,0x1E,0x33,0x33,0x1E,0x00}, /* 56 '8' */
+    {0x1E,0x33,0x33,0x3E,0x30,0x18,0x0E,0x00}, /* 57 '9' */
+    {0x00,0x0C,0x0C,0x00,0x00,0x0C,0x0C,0x00}, /* 58 ':' */
+    {0x00,0x0C,0x0C,0x00,0x00,0x0C,0x0C,0x06}, /* 59 ';' */
+    {0x18,0x0C,0x06,0x03,0x06,0x0C,0x18,0x00}, /* 60 '<' */
+    {0x00,0x00,0x3F,0x00,0x00,0x3F,0x00,0x00}, /* 61 '=' */
+    {0x06,0x0C,0x18,0x30,0x18,0x0C,0x06,0x00}, /* 62 '>' */
+    {0x1E,0x33,0x30,0x18,0x0C,0x00,0x0C,0x00}, /* 63 '?' */
+    {0x3E,0x63,0x7B,0x7B,0x7B,0x03,0x1E,0x00}, /* 64 '@' */
+    {0x0C,0x1E,0x33,0x33,0x3F,0x33,0x33,0x00}, /* 65 'A' */
+    {0x3F,0x66,0x66,0x3E,0x66,0x66,0x3F,0x00}, /* 66 'B' */
+    {0x3C,0x66,0x03,0x03,0x03,0x66,0x3C,0x00}, /* 67 'C' */
+    {0x1F,0x36,0x66,0x66,0x66,0x36,0x1F,0x00}, /* 68 'D' */
+    {0x7F,0x46,0x16,0x1E,0x16,0x46,0x7F,0x00}, /* 69 'E' */
+    {0x7F,0x46,0x16,0x1E,0x16,0x06,0x0F,0x00}, /* 70 'F' */
+    {0x3C,0x66,0x03,0x03,0x73,0x66,0x7C,0x00}, /* 71 'G' */
+    {0x33,0x33,0x33,0x3F,0x33,0x33,0x33,0x00}, /* 72 'H' */
+    {0x1E,0x0C,0x0C,0x0C,0x0C,0x0C,0x1E,0x00}, /* 73 'I' */
+    {0x78,0x30,0x30,0x30,0x33,0x33,0x1E,0x00}, /* 74 'J' */
+    {0x67,0x66,0x36,0x1E,0x36,0x66,0x67,0x00}, /* 75 'K' */
+    {0x0F,0x06,0x06,0x06,0x46,0x66,0x7F,0x00}, /* 76 'L' */
+    {0x63,0x77,0x7F,0x7F,0x6B,0x63,0x63,0x00}, /* 77 'M' */
+    {0x63,0x67,0x6F,0x7B,0x73,0x63,0x63,0x00}, /* 78 'N' */
+    {0x1C,0x36,0x63,0x63,0x63,0x36,0x1C,0x00}, /* 79 'O' */
+    {0x3F,0x66,0x66,0x3E,0x06,0x06,0x0F,0x00}, /* 80 'P' */
+    {0x1E,0x33,0x33,0x33,0x3B,0x1E,0x38,0x00}, /* 81 'Q' */
+    {0x3F,0x66,0x66,0x3E,0x36,0x66,0x67,0x00}, /* 82 'R' */
+    {0x1E,0x33,0x07,0x0E,0x38,0x33,0x1E,0x00}, /* 83 'S' */
+    {0x3F,0x2D,0x0C,0x0C,0x0C,0x0C,0x1E,0x00}, /* 84 'T' */
+    {0x33,0x33,0x33,0x33,0x33,0x33,0x3F,0x00}, /* 85 'U' */
+    {0x33,0x33,0x33,0x33,0x33,0x1E,0x0C,0x00}, /* 86 'V' */
+    {0x63,0x63,0x63,0x6B,0x7F,0x77,0x63,0x00}, /* 87 'W' */
+    {0x63,0x63,0x36,0x1C,0x1C,0x36,0x63,0x00}, /* 88 'X' */
+    {0x33,0x33,0x33,0x1E,0x0C,0x0C,0x1E,0x00}, /* 89 'Y' */
+    {0x7F,0x63,0x31,0x18,0x4C,0x66,0x7F,0x00}, /* 90 'Z' */
+    {0x1E,0x06,0x06,0x06,0x06,0x06,0x1E,0x00}, /* 91 '[' */
+    {0x03,0x06,0x0C,0x18,0x30,0x60,0x40,0x00}, /* 92 '\' */
+    {0x1E,0x18,0x18,0x18,0x18,0x18,0x1E,0x00}, /* 93 ']' */
+    {0x08,0x1C,0x36,0x63,0x00,0x00,0x00,0x00}, /* 94 '^' */
+    {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xFF}, /* 95 '_' */
+    {0x0C,0x0C,0x18,0x00,0x00,0x00,0x00,0x00}, /* 96 '`' */
+    {0x00,0x00,0x1E,0x30,0x3E,0x33,0x6E,0x00}, /* 97 'a' */
+    {0x07,0x06,0x06,0x3E,0x66,0x66,0x3B,0x00}, /* 98 'b' */
+    {0x00,0x00,0x1E,0x33,0x03,0x33,0x1E,0x00}, /* 99 'c' */
+    {0x38,0x30,0x30,0x3e,0x33,0x33,0x6E,0x00}, /* 100 'd' */
+    {0x00,0x00,0x1E,0x33,0x3f,0x03,0x1E,0x00}, /* 101 'e' */
+    {0x1C,0x36,0x06,0x0f,0x06,0x06,0x0F,0x00}, /* 102 'f' */
+    {0x00,0x00,0x6E,0x33,0x33,0x3E,0x30,0x1F}, /* 103 'g' */
+    {0x07,0x06,0x36,0x6E,0x66,0x66,0x67,0x00}, /* 104 'h' */
+    {0x0C,0x00,0x0E,0x0C,0x0C,0x0C,0x1E,0x00}, /* 105 'i' */
+    {0x30,0x00,0x30,0x30,0x30,0x33,0x33,0x1E}, /* 106 'j' */
+    {0x07,0x06,0x66,0x36,0x1E,0x36,0x67,0x00}, /* 107 'k' */
+    {0x0E,0x0C,0x0C,0x0C,0x0C,0x0C,0x1E,0x00}, /* 108 'l' */
+    {0x00,0x00,0x33,0x7F,0x7F,0x6B,0x63,0x00}, /* 109 'm' */
+    {0x00,0x00,0x1F,0x33,0x33,0x33,0x33,0x00}, /* 110 'n' */
+    {0x00,0x00,0x1E,0x33,0x33,0x33,0x1E,0x00}, /* 111 'o' */
+    {0x00,0x00,0x3B,0x66,0x66,0x3E,0x06,0x0F}, /* 112 'p' */
+    {0x00,0x00,0x6E,0x33,0x33,0x3E,0x30,0x78}, /* 113 'q' */
+    {0x00,0x00,0x3B,0x6E,0x66,0x06,0x0F,0x00}, /* 114 'r' */
+    {0x00,0x00,0x3E,0x03,0x1E,0x30,0x1F,0x00}, /* 115 's' */
+    {0x08,0x0C,0x3E,0x0C,0x0C,0x2C,0x18,0x00}, /* 116 't' */
+    {0x00,0x00,0x33,0x33,0x33,0x33,0x6E,0x00}, /* 117 'u' */
+    {0x00,0x00,0x33,0x33,0x33,0x1E,0x0C,0x00}, /* 118 'v' */
+    {0x00,0x00,0x63,0x6B,0x7F,0x7F,0x36,0x00}, /* 119 'w' */
+    {0x00,0x00,0x63,0x36,0x1C,0x36,0x63,0x00}, /* 120 'x' */
+    {0x00,0x00,0x33,0x33,0x33,0x3E,0x30,0x1F}, /* 121 'y' */
+    {0x00,0x00,0x3F,0x19,0x0C,0x26,0x3F,0x00}, /* 122 'z' */
+    {0x38,0x0C,0x0C,0x07,0x0C,0x0C,0x38,0x00}, /* 123 '{' */
+    {0x18,0x18,0x18,0x00,0x18,0x18,0x18,0x00}, /* 124 '|' */
+    {0x07,0x0C,0x0C,0x38,0x0C,0x0C,0x07,0x00}, /* 125 '}' */
+    {0x6E,0x3B,0x00,0x00,0x00,0x00,0x00,0x00}  /* 126 '~' */
+};
+
+/* Configuration Data Structures */
+#define MAX_PAGES      16
+#define MAX_OPTIONS    8
+#define MAX_PROGRESS   8
+#define MAX_STEPS      20
+#define MAX_COMP_LINES 8
+#define MAX_STR        256
+#define MAX_CMD        1024
 
 typedef struct {
     char value[64];
-    char next_target[64]; /* "next", "quit", "page:<id>", "run:<id>" */
+    char next_target[64]; /* "next", "page:<id>", "run:<id>", "quit" */
     char label[MAX_STR];
     char desc[MAX_STR];
 } WizardOption;
 
 typedef struct {
     char id[64];
-    char title[MAX_STR];  /* Step Name */
+    char title[MAX_STR];  /* Dialog Title (Step Name) */
     char var[64];
     int default_idx;
     int selected_idx;
@@ -106,113 +225,14 @@ typedef struct {
     WizardPage pages[MAX_PAGES];
     int num_progress;
     ProgressFlow flows[MAX_PROGRESS];
-} WizardConfig;
+} SetupConfig;
 
-static WizardConfig g_cfg;
+static SetupConfig g_cfg;
 
-/* Embedded 8x8 bitmap font for ASCII 32..126 */
-static const unsigned char font8x8_basic[96][8] = {
-    {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00}, /*   */
-    {0x18,0x3c,0x3c,0x18,0x18,0x00,0x18,0x00}, /* ! */
-    {0x66,0x66,0x24,0x00,0x00,0x00,0x00,0x00}, /* " */
-    {0x6c,0x6c,0xfe,0x6c,0xfe,0x6c,0x6c,0x00}, /* # */
-    {0x18,0x3e,0x60,0x3c,0x06,0x7c,0x18,0x00}, /* $ */
-    {0x00,0x66,0xa6,0xdc,0x3b,0x65,0x66,0x00}, /* % */
-    {0x38,0x6c,0x38,0x76,0xdc,0xcc,0x76,0x00}, /* & */
-    {0x18,0x18,0x30,0x00,0x00,0x00,0x00,0x00}, /* ' */
-    {0x0c,0x18,0x30,0x30,0x30,0x18,0x0c,0x00}, /* ( */
-    {0x30,0x18,0x0c,0x0c,0x0c,0x18,0x30,0x00}, /* ) */
-    {0x00,0x66,0x3c,0xff,0x3c,0x66,0x00,0x00}, /* * */
-    {0x00,0x18,0x18,0x7e,0x18,0x18,0x00,0x00}, /* + */
-    {0x00,0x00,0x00,0x00,0x00,0x18,0x18,0x30}, /* , */
-    {0x00,0x00,0x00,0x7e,0x00,0x00,0x00,0x00}, /* - */
-    {0x00,0x00,0x00,0x00,0x00,0x18,0x18,0x00}, /* . */
-    {0x06,0x0c,0x18,0x30,0x60,0xc0,0x80,0x00}, /* / */
-    {0x3c,0x66,0xc3,0xc3,0xc3,0x66,0x3c,0x00}, /* 0 */
-    {0x18,0x38,0x18,0x18,0x18,0x18,0x7e,0x00}, /* 1 */
-    {0x3c,0x66,0x06,0x1c,0x30,0x60,0x7e,0x00}, /* 2 */
-    {0x3c,0x66,0x06,0x1c,0x06,0x66,0x3c,0x00}, /* 3 */
-    {0x0c,0x1c,0x3c,0x6c,0xfe,0x0c,0x0c,0x00}, /* 4 */
-    {0x7e,0x60,0x7c,0x06,0x06,0x66,0x3c,0x00}, /* 5 */
-    {0x3c,0x66,0x60,0x7c,0x66,0x66,0x3c,0x00}, /* 6 */
-    {0x7e,0x06,0x0c,0x18,0x30,0x30,0x30,0x00}, /* 7 */
-    {0x3c,0x66,0x66,0x3c,0x66,0x66,0x3c,0x00}, /* 8 */
-    {0x3c,0x66,0x66,0x3e,0x06,0x66,0x3c,0x00}, /* 9 */
-    {0x00,0x18,0x18,0x00,0x00,0x18,0x18,0x00}, /* : */
-    {0x00,0x18,0x18,0x00,0x00,0x18,0x18,0x30}, /* ; */
-    {0x0c,0x18,0x30,0x60,0x30,0x18,0x0c,0x00}, /* < */
-    {0x00,0x00,0x7e,0x00,0x7e,0x00,0x00,0x00}, /* = */
-    {0x30,0x18,0x0c,0x06,0x0c,0x18,0x30,0x00}, /* > */
-    {0x3c,0x66,0x06,0x0c,0x18,0x00,0x18,0x00}, /* ? */
-    {0x3c,0x66,0xdf,0xdd,0xd1,0x60,0x3e,0x00}, /* @ */
-    {0x38,0x6c,0xc6,0xc6,0xfe,0xc6,0xc6,0x00}, /* A */
-    {0xfc,0x66,0x66,0x7c,0x66,0x66,0xfc,0x00}, /* B */
-    {0x3c,0x66,0xc0,0xc0,0xc0,0x66,0x3c,0x00}, /* C */
-    {0xf8,0x6c,0x66,0x66,0x66,0x6c,0xf8,0x00}, /* D */
-    {0xfe,0x62,0x68,0x78,0x68,0x62,0xfe,0x00}, /* E */
-    {0xfe,0x62,0x68,0x78,0x68,0x60,0xf0,0x00}, /* F */
-    {0x3c,0x66,0xc0,0xc0,0xce,0x66,0x3e,0x00}, /* G */
-    {0xc6,0xc6,0xc6,0xfe,0xc6,0xc6,0xc6,0x00}, /* H */
-    {0x3c,0x18,0x18,0x18,0x18,0x18,0x3c,0x00}, /* I */
-    {0x1e,0x0c,0x0c,0x0c,0xcc,0xcc,0x78,0x00}, /* J */
-    {0xe6,0x66,0x6c,0x78,0x6c,0x66,0xe6,0x00}, /* K */
-    {0xf0,0x60,0x60,0x60,0x62,0x66,0xfe,0x00}, /* L */
-    {0xc6,0xee,0xfe,0xd6,0xc6,0xc6,0xc6,0x00}, /* M */
-    {0xc6,0xe6,0xf6,0xde,0xce,0xc6,0xc6,0x00}, /* N */
-    {0x38,0x6c,0xc6,0xc6,0xc6,0x6c,0x38,0x00}, /* O */
-    {0xfc,0x66,0x66,0x7c,0x60,0x60,0xf0,0x00}, /* P */
-    {0x38,0x6c,0xc6,0xc6,0xda,0x6c,0x3e,0x00}, /* Q */
-    {0xfc,0x66,0x66,0x7c,0x6c,0x66,0xe6,0x00}, /* R */
-    {0x3c,0x66,0x60,0x3c,0x06,0x66,0x3c,0x00}, /* S */
-    {0x7e,0x5a,0x18,0x18,0x18,0x18,0x3c,0x00}, /* T */
-    {0xc6,0xc6,0xc6,0xc6,0xc6,0xc6,0x7c,0x00}, /* U */
-    {0xc6,0xc6,0xc6,0xc6,0xc6,0x6c,0x38,0x00}, /* V */
-    {0xc6,0xc6,0xc6,0xd6,0xfe,0xee,0xc6,0x00}, /* W */
-    {0xc6,0xc6,0x6c,0x38,0x6c,0xc6,0xc6,0x00}, /* X */
-    {0x66,0x66,0x66,0x3c,0x18,0x18,0x3c,0x00}, /* Y */
-    {0xfe,0xc6,0x8c,0x18,0x32,0x66,0xfe,0x00}, /* Z */
-    {0x3c,0x30,0x30,0x30,0x30,0x30,0x3c,0x00}, /* [ */
-    {0xc0,0x60,0x30,0x18,0x0c,0x06,0x02,0x00}, /* \ */
-    {0x3c,0x0c,0x0c,0x0c,0x0c,0x0c,0x3c,0x00}, /* ] */
-    {0x10,0x38,0x6c,0xc6,0x00,0x00,0x00,0x00}, /* ^ */
-    {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xff}, /* _ */
-    {0x30,0x18,0x0c,0x00,0x00,0x00,0x00,0x00}, /* ` */
-    {0x00,0x00,0x78,0x0c,0x7c,0xcc,0x76,0x00}, /* a */
-    {0xe0,0x60,0x7c,0x66,0x66,0x66,0xdc,0x00}, /* b */
-    {0x00,0x00,0x3c,0x66,0x60,0x66,0x3c,0x00}, /* c */
-    {0x1c,0x0c,0x7c,0xcc,0xcc,0xcc,0x76,0x00}, /* d */
-    {0x00,0x00,0x3c,0x66,0xfe,0x60,0x3c,0x00}, /* e */
-    {0x1c,0x36,0x30,0x78,0x30,0x30,0x78,0x00}, /* f */
-    {0x00,0x00,0x3e,0x66,0x66,0x3e,0x06,0x7c}, /* g */
-    {0xe0,0x60,0x6c,0x76,0x66,0x66,0xe6,0x00}, /* h */
-    {0x18,0x00,0x38,0x18,0x18,0x18,0x3c,0x00}, /* i */
-    {0x06,0x00,0x06,0x06,0x06,0x66,0x3c,0x00}, /* j */
-    {0xe0,0x60,0x66,0x6c,0x78,0x6c,0xe6,0x00}, /* k */
-    {0x38,0x18,0x18,0x18,0x18,0x18,0x3c,0x00}, /* l */
-    {0x00,0x00,0xec,0xfe,0xd6,0xc6,0xc6,0x00}, /* m */
-    {0x00,0x00,0xdc,0x66,0x66,0x66,0x66,0x00}, /* n */
-    {0x00,0x00,0x3c,0x66,0x66,0x66,0x3c,0x00}, /* o */
-    {0x00,0x00,0xdc,0x66,0x66,0x7c,0x60,0xf0}, /* p */
-    {0x00,0x00,0x76,0xcc,0xcc,0x7c,0x0c,0x1e}, /* q */
-    {0x00,0x00,0xdc,0x76,0x60,0x60,0xf0,0x00}, /* r */
-    {0x00,0x00,0x3c,0x60,0x3c,0x06,0x7c,0x00}, /* s */
-    {0x30,0x30,0x7c,0x30,0x30,0x34,0x18,0x00}, /* t */
-    {0x00,0x00,0xcc,0xcc,0xcc,0xcc,0x76,0x00}, /* u */
-    {0x00,0x00,0xc6,0xc6,0xc6,0x6c,0x38,0x00}, /* v */
-    {0x00,0x00,0xc6,0xc6,0xd6,0xfe,0x6c,0x00}, /* w */
-    {0x00,0x00,0xc6,0x6c,0x38,0x6c,0xc6,0x00}, /* x */
-    {0x00,0x00,0xc6,0xc6,0x66,0x3e,0x06,0x7c}, /* y */
-    {0x00,0x00,0x7e,0x4c,0x18,0x32,0x7e,0x00}, /* z */
-    {0x0e,0x18,0x18,0x70,0x18,0x18,0x0e,0x00}, /* { */
-    {0x18,0x18,0x18,0x18,0x18,0x18,0x18,0x00}, /* | */
-    {0x70,0x18,0x18,0x0e,0x18,0x18,0x70,0x00}, /* } */
-    {0x76,0xdc,0x00,0x00,0x00,0x00,0x00,0x00}  /* ~ */
-};
-
-/* String trim & variable expansion helpers */
+/* String Utilities */
 static char *trim_ws(char *s) {
     while (*s && isspace((unsigned char)*s)) s++;
-    if (*s == 0) return s;
+    if (*s == '\0') return s;
     char *end = s + strlen(s) - 1;
     while (end > s && isspace((unsigned char)*end)) {
         *end = '\0';
@@ -222,61 +242,64 @@ static char *trim_ws(char *s) {
 }
 
 static void safe_copy(char *dst, const char *src, size_t dst_size) {
-    if (!dst || dst_size == 0) return;
     if (!src) {
         dst[0] = '\0';
         return;
     }
-    snprintf(dst, dst_size, "%s", src);
+    strncpy(dst, src, dst_size - 1);
+    dst[dst_size - 1] = '\0';
 }
 
+/* Expand $VAR or ${VAR} from environment */
 static void expand_vars(const char *src, char *dst, size_t dst_size) {
-    if (!dst || dst_size == 0) return;
-    size_t out_i = 0;
+    size_t di = 0;
     const char *p = src;
-
-    while (*p && out_i + 1 < dst_size) {
+    while (*p && di + 1 < dst_size) {
         if (*p == '$') {
             p++;
-            char var_name[64];
-            size_t v_i = 0;
+            char vname[64];
+            size_t vi = 0;
             int braced = 0;
             if (*p == '{') {
                 braced = 1;
                 p++;
             }
-            while (*p && (isalnum((unsigned char)*p) || *p == '_') && v_i + 1 < sizeof(var_name)) {
-                var_name[v_i++] = *p++;
+            while (*p && (isalnum((unsigned char)*p) || *p == '_') && vi + 1 < sizeof(vname)) {
+                vname[vi++] = *p++;
             }
-            var_name[v_i] = '\0';
+            vname[vi] = '\0';
             if (braced && *p == '}') p++;
 
-            if (v_i > 0) {
-                const char *val = getenv(var_name);
+            if (vi > 0) {
+                const char *val = getenv(vname);
                 if (val) {
-                    while (*val && out_i + 1 < dst_size) {
-                        dst[out_i++] = *val++;
+                    while (*val && di + 1 < dst_size) {
+                        dst[di++] = *val++;
                     }
                 }
             } else {
-                dst[out_i++] = '$';
+                dst[di++] = '$';
             }
         } else {
-            dst[out_i++] = *p++;
+            dst[di++] = *p++;
         }
     }
-    dst[out_i] = '\0';
+    dst[di] = '\0';
 }
 
-static int split_pipe_fields(char *line, char **fields, int max_fields) {
+static int split_pipe_fields(char *line, char *fields[], int max_fields) {
     int count = 0;
     char *cur = line;
     while (cur && count < max_fields) {
-        char *sep = strchr(cur, '|');
-        if (sep && count < max_fields - 1) {
-            *sep = '\0';
+        if (count == max_fields - 1) {
             fields[count++] = trim_ws(cur);
-            cur = sep + 1;
+            break;
+        }
+        char *bar = strchr(cur, '|');
+        if (bar) {
+            *bar = '\0';
+            fields[count++] = trim_ws(cur);
+            cur = bar + 1;
         } else {
             fields[count++] = trim_ws(cur);
             break;
@@ -287,7 +310,7 @@ static int split_pipe_fields(char *line, char **fields, int max_fields) {
 
 static void parse_config_stream(FILE *fp) {
     memset(&g_cfg, 0, sizeof(g_cfg));
-    safe_copy(g_cfg.header, "Windows XP Setup", sizeof(g_cfg.header));
+    safe_copy(g_cfg.header, "playOS Setup Utility", sizeof(g_cfg.header));
 
     int section_type = 0; /* 0 = global, 1 = [page], 2 = [progress] */
     WizardPage *cur_page = NULL;
@@ -309,7 +332,7 @@ static void parse_config_stream(FILE *fp) {
             if (g_cfg.num_progress < MAX_PROGRESS) {
                 cur_flow = &g_cfg.flows[g_cfg.num_progress++];
                 memset(cur_flow, 0, sizeof(*cur_flow));
-                safe_copy(cur_flow->box_title, "Setup is copying files...", sizeof(cur_flow->box_title));
+                safe_copy(cur_flow->box_title, "Setup Progress", sizeof(cur_flow->box_title));
                 safe_copy(cur_flow->complete_title, "Setup Complete", sizeof(cur_flow->complete_title));
                 section_type = 2;
             }
@@ -367,14 +390,14 @@ static void parse_config_stream(FILE *fp) {
     }
 }
 
-/* Drawing primitives */
+/* Font & Primitive Rendering (LSB-first bit order for font8x8_basic) */
 static void draw_char(SDL_Renderer *rend, int x, int y, char c, int scale_x, int scale_y) {
     if (c < 32 || c > 126) c = ' ';
     const unsigned char *glyph = font8x8_basic[c - 32];
     for (int row = 0; row < 8; row++) {
         unsigned char bits = glyph[row];
         for (int col = 0; col < 8; col++) {
-            if (bits & (0x80 >> col)) {
+            if (bits & (1 << col)) {
                 SDL_Rect r = { x + col * scale_x, y + row * scale_y, scale_x, scale_y };
                 SDL_RenderFillRect(rend, &r);
             }
@@ -382,7 +405,7 @@ static void draw_char(SDL_Renderer *rend, int x, int y, char c, int scale_x, int
     }
 }
 
-/* Bold 16x16 text (scale_x=2, scale_y=2) matching the clean mockup */
+/* Bold 16x16 text (scale_x=2, scale_y=2) */
 static void draw_bold_text(SDL_Renderer *rend, int x, int y, const char *str, Uint8 r, Uint8 g, Uint8 b) {
     SDL_SetRenderDrawColor(rend, r, g, b, 255);
     int cur_x = x;
@@ -393,7 +416,7 @@ static void draw_bold_text(SDL_Renderer *rend, int x, int y, const char *str, Ui
     }
 }
 
-/* Compact 8x16 VGA text (scale_x=1, scale_y=2) for descriptions & progress screen */
+/* Standard 8x16 VGA terminal text (scale_x=1, scale_y=2) */
 static void draw_vga_text(SDL_Renderer *rend, int x, int y, const char *str, Uint8 r, Uint8 g, Uint8 b) {
     SDL_SetRenderDrawColor(rend, r, g, b, 255);
     int cur_x = x;
@@ -404,66 +427,122 @@ static void draw_vga_text(SDL_Renderer *rend, int x, int y, const char *str, Uin
     }
 }
 
+/* Faux-Bold 8x16 VGA text (double-struck by 1px for crisp ncurses readability) */
+static void draw_vga_bold(SDL_Renderer *rend, int x, int y, const char *str, Uint8 r, Uint8 g, Uint8 b) {
+    draw_vga_text(rend, x, y, str, r, g, b);
+    draw_vga_text(rend, x + 1, y, str, r, g, b);
+}
+
 static void draw_vga_centered(SDL_Renderer *rend, int center_x, int y, const char *str, Uint8 r, Uint8 g, Uint8 b) {
     int w = (int)strlen(str) * 8;
     draw_vga_text(rend, center_x - (w / 2), y, str, r, g, b);
 }
 
-static void draw_thick_rect(SDL_Renderer *rend, int x, int y, int w, int h, int thickness, Uint8 r, Uint8 g, Uint8 b) {
-    SDL_SetRenderDrawColor(rend, r, g, b, 255);
-    for (int t = 0; t < thickness; t++) {
-        SDL_Rect rect = { x + t, y + t, w - 2 * t, h - 2 * t };
-        SDL_RenderDrawRect(rend, &rect);
-    }
+static void draw_vga_bold_centered(SDL_Renderer *rend, int center_x, int y, const char *str, Uint8 r, Uint8 g, Uint8 b) {
+    int w = (int)strlen(str) * 8;
+    draw_vga_bold(rend, center_x - (w / 2), y, str, r, g, b);
 }
 
-static void draw_double_box(SDL_Renderer *rend, int x, int y, int w, int h) {
-    SDL_SetRenderDrawColor(rend, FG_WHITE_R, FG_WHITE_G, FG_WHITE_B, 255);
-    SDL_Rect outer = { x, y, w, h };
-    SDL_Rect inner = { x + 3, y + 3, w - 6, h - 6 };
-    SDL_RenderDrawRect(rend, &outer);
-    SDL_RenderDrawRect(rend, &inner);
+/* Draw a 3D Beveled Box (raised=1: white top/left, dark bottom/right; raised=0: sunken) */
+static void draw_3d_bevel(SDL_Renderer *rend, int x, int y, int w, int h, int raised) {
+    Uint8 tl_r = raised ? DLG_LIGHT_R : DLG_DARK_R;
+    Uint8 tl_g = raised ? DLG_LIGHT_G : DLG_DARK_G;
+    Uint8 tl_b = raised ? DLG_LIGHT_B : DLG_DARK_B;
+
+    Uint8 br_r = raised ? DLG_DARK_R : DLG_LIGHT_R;
+    Uint8 br_g = raised ? DLG_DARK_G : DLG_LIGHT_G;
+    Uint8 br_b = raised ? DLG_DARK_B : DLG_LIGHT_B;
+
+    /* Top & Left (2px thick) */
+    SDL_SetRenderDrawColor(rend, tl_r, tl_g, tl_b, 255);
+    SDL_Rect top_bar = { x, y, w, 2 };
+    SDL_Rect left_bar = { x, y, 2, h };
+    SDL_RenderFillRect(rend, &top_bar);
+    SDL_RenderFillRect(rend, &left_bar);
+
+    /* Bottom & Right (2px thick) */
+    SDL_SetRenderDrawColor(rend, br_r, br_g, br_b, 255);
+    SDL_Rect bot_bar = { x, y + h - 2, w, 2 };
+    SDL_Rect right_bar = { x + w - 2, y, 2, h };
+    SDL_RenderFillRect(rend, &bot_bar);
+    SDL_RenderFillRect(rend, &right_bar);
 }
 
-/* Draw Top-Left Header + "=============" matching the mockup */
-static void draw_mockup_header(SDL_Renderer *rend) {
+/* Draw the ncurses blue screen backdrop, top `--backtitle`, and 3D gray dialog window */
+static void draw_ncurses_window(SDL_Renderer *rend, int dx, int dy, int dw, int dh, const char *dlg_title) {
     char hdr_exp[MAX_STR];
     expand_vars(g_cfg.header, hdr_exp, sizeof(hdr_exp));
 
-    SDL_SetRenderDrawColor(rend, BG_BLUE_R, BG_BLUE_G, BG_BLUE_B, 255);
+    /* 1. Classic ncurses Blue Screen Background */
+    SDL_SetRenderDrawColor(rend, BG_SCREEN_R, BG_SCREEN_G, BG_SCREEN_B, 255);
     SDL_RenderClear(rend);
 
-    draw_bold_text(rend, 48, 36, hdr_exp, FG_WHITE_R, FG_WHITE_G, FG_WHITE_B);
+    /* 2. Top-left `--backtitle` + Horizontal Rule across top */
+    draw_vga_bold(rend, 16, 10, hdr_exp, FG_CYAN_R, FG_CYAN_G, FG_CYAN_B);
+    SDL_SetRenderDrawColor(rend, FG_CYAN_R, FG_CYAN_G, FG_CYAN_B, 255);
+    SDL_Rect back_hr = { 16, 32, SCREEN_W - 32, 2 };
+    SDL_RenderFillRect(rend, &back_hr);
 
-    /* Draw "=============" under Header */
-    int eq_count = (int)strlen(hdr_exp);
-    if (eq_count < 13) eq_count = 13;
-    if (eq_count > 34) eq_count = 34;
-    char eq_bar[40];
-    for (int i = 0; i < eq_count; i++) eq_bar[i] = '=';
-    eq_bar[eq_count] = '\0';
-    draw_bold_text(rend, 48, 66, eq_bar, FG_WHITE_R, FG_WHITE_G, FG_WHITE_B);
+    /* 3. Black Drop Shadow offset (+12px right, +12px down) */
+    SDL_SetRenderDrawColor(rend, SHADOW_R, SHADOW_G, SHADOW_B, 255);
+    SDL_Rect shadow = { dx + 12, dy + 12, dw, dh };
+    SDL_RenderFillRect(rend, &shadow);
+
+    /* 4. Light Gray Dialog Window Surface */
+    SDL_SetRenderDrawColor(rend, DLG_GRAY_R, DLG_GRAY_G, DLG_GRAY_B, 255);
+    SDL_Rect box = { dx, dy, dw, dh };
+    SDL_RenderFillRect(rend, &box);
+
+    /* 5. Outer 3D Raised Frame (inset by 8px, like ncurses dialog box border) */
+    int fx = dx + 8;
+    int fy = dy + 10;
+    int fw = dw - 16;
+    int fh = dh - 18;
+    draw_3d_bevel(rend, fx, fy, fw, fh, 1);
+
+    /* 6. Centered Dialog `--title` sitting on the top border */
+    if (dlg_title && dlg_title[0] != '\0') {
+        char title_exp[MAX_STR];
+        expand_vars(dlg_title, title_exp, sizeof(title_exp));
+        int tw = ((int)strlen(title_exp) + 2) * 8;
+        int tx = dx + (dw - tw) / 2;
+
+        SDL_SetRenderDrawColor(rend, DLG_GRAY_R, DLG_GRAY_G, DLG_GRAY_B, 255);
+        SDL_Rect tpad = { tx - 4, fy - 7, tw + 8, 18 };
+        SDL_RenderFillRect(rend, &tpad);
+
+        char bracketed[MAX_STR + 8];
+        snprintf(bracketed, sizeof(bracketed), " %s ", title_exp);
+        draw_vga_bold(rend, tx, fy - 7, bracketed, FG_NAVY_R, FG_NAVY_G, FG_NAVY_B);
+    }
+
+    /* 7. Bottom Footer Hint on Blue Screen */
+    draw_vga_centered(rend, 320, 456, "UP/DOWN: Select Option   LEFT/RIGHT: Select Button   A/B: Confirm", FG_CYAN_R, FG_CYAN_G, FG_CYAN_B);
 }
 
-/* Draw an Action Button ([ OK ], [ Back ], [ Exit ]) */
-static void draw_action_button(SDL_Renderer *rend, int x, int y, int w, int h, const char *label, int is_focused, int is_disabled) {
-    int text_w = (int)strlen(label) * 16;
+/* Draw an ncurses `<  OK  >` / `< Back >` / `< Exit >` Button */
+static void draw_ncurses_button(SDL_Renderer *rend, int x, int y, int w, int h, const char *label, int is_focused, int is_disabled) {
+    char btn_text[32];
+    snprintf(btn_text, sizeof(btn_text), "< %s >", label);
+    int text_w = (int)strlen(btn_text) * 16;
     int text_x = x + (w - text_w) / 2;
     int text_y = y + (h - 16) / 2;
 
     if (is_disabled) {
-        draw_thick_rect(rend, x, y, w, h, 2, FG_MUTED_R, FG_MUTED_G, FG_MUTED_B);
-        draw_bold_text(rend, text_x, text_y, label, FG_MUTED_R, FG_MUTED_G, FG_MUTED_B);
+        draw_bold_text(rend, text_x, text_y, btn_text, FG_MUTED_R, FG_MUTED_G, FG_MUTED_B);
     } else if (is_focused) {
-        /* Focused Button: Solid White Fill + Deep Blue Text */
-        SDL_SetRenderDrawColor(rend, FG_WHITE_R, FG_WHITE_G, FG_WHITE_B, 255);
+        /* Active ncurses Button: Navy Fill + 3D Raised Bevel + White `< >` + Yellow Label */
+        SDL_SetRenderDrawColor(rend, HL_NAVY_R, HL_NAVY_G, HL_NAVY_B, 255);
         SDL_Rect fill = { x, y, w, h };
         SDL_RenderFillRect(rend, &fill);
-        draw_bold_text(rend, text_x, text_y, label, BG_BLUE_R, BG_BLUE_G, BG_BLUE_B);
+        draw_3d_bevel(rend, x, y, w, h, 1);
+
+        draw_bold_text(rend, text_x, text_y, "<", FG_WHITE_R, FG_WHITE_G, FG_WHITE_B);
+        draw_bold_text(rend, text_x + 32, text_y, label, FG_YELLOW_R, FG_YELLOW_G, FG_YELLOW_B);
+        draw_bold_text(rend, text_x + text_w - 16, text_y, ">", FG_WHITE_R, FG_WHITE_G, FG_WHITE_B);
     } else {
-        /* Unfocused Button: 2px White Outline + White Text */
-        draw_thick_rect(rend, x, y, w, h, 2, FG_WHITE_R, FG_WHITE_G, FG_WHITE_B);
-        draw_bold_text(rend, text_x, text_y, label, FG_WHITE_R, FG_WHITE_G, FG_WHITE_B);
+        /* Unfocused Enabled Button: `< Label >` in Black on Gray */
+        draw_bold_text(rend, text_x, text_y, btn_text, FG_BLACK_R, FG_BLACK_G, FG_BLACK_B);
     }
 }
 
@@ -581,115 +660,117 @@ static InputAction poll_user_action(void) {
     return act;
 }
 
-/* Render Wizard Page matching the user's mockup */
+/* Render Wizard Page inside the 3D ncurses Dialog Window */
 static void render_wizard_page(SDL_Renderer *rend, WizardPage *page, int action_idx, int can_go_back) {
-    draw_mockup_header(rend);
+    int dx = 34, dy = 52, dw = 560, dh = 384;
+    draw_ncurses_window(rend, dx, dy, dw, dh, page->title);
 
     char buf[MAX_STR];
-    expand_vars(page->title, buf, sizeof(buf));
-    draw_bold_text(rend, 48, 118, buf, FG_WHITE_R, FG_WHITE_G, FG_WHITE_B);
-
     int n = page->num_options;
-    int start_y = 164;
-    int row_step = 38;
+
+    /* Selected option description above the sunken list box */
+    if (n > 0 && page->options[page->selected_idx].desc[0] != '\0') {
+        expand_vars(page->options[page->selected_idx].desc, buf, sizeof(buf));
+        draw_vga_bold(rend, dx + 26, dy + 32, buf, FG_BLACK_R, FG_BLACK_G, FG_BLACK_B);
+    } else {
+        draw_vga_bold(rend, dx + 26, dy + 32, "Use UP/DOWN to select an option, then press OK:", FG_BLACK_R, FG_BLACK_G, FG_BLACK_B);
+    }
+
+    /* Sunken 3D Inner Box for the Options List (like dialog --radiolist) */
+    int sx = dx + 26;
+    int sy = dy + 64;
+    int sw = dw - 52;
+    int sh = 224;
+    draw_3d_bevel(rend, sx, sy, sw, sh, 0); /* raised = 0 (sunken) */
+
+    int start_y = sy + 16;
+    int row_step = 40;
 
     for (int i = 0; i < n; i++) {
         int y = start_y + (i * row_step);
         char opt_label[MAX_STR];
         expand_vars(page->options[i].label, opt_label, sizeof(opt_label));
 
-        char full_line[MAX_STR + 8];
         if (i == page->selected_idx) {
-            /* Highlight bar behind selected option + [X] marker */
-            int bar_w = ((int)strlen(opt_label) + 4) * 16 + 20;
-            if (bar_w < 340) bar_w = 340;
-            if (bar_w > 544) bar_w = 544;
-
-            SDL_SetRenderDrawColor(rend, HL_BLUE_R, HL_BLUE_G, HL_BLUE_B, 255);
-            SDL_Rect hl = { 42, y - 6, bar_w, 28 };
+            /* Highlight Bar inside Sunken Box */
+            SDL_SetRenderDrawColor(rend, HL_NAVY_R, HL_NAVY_G, HL_NAVY_B, 255);
+            SDL_Rect hl = { sx + 6, y - 6, sw - 12, 30 };
             SDL_RenderFillRect(rend, &hl);
 
-            SDL_SetRenderDrawColor(rend, FG_YELLOW_R, FG_YELLOW_G, FG_YELLOW_B, 255);
-            SDL_Rect accent = { 42, y - 6, 4, 28 };
-            SDL_RenderFillRect(rend, &accent);
-
-            snprintf(full_line, sizeof(full_line), "[X] %s", opt_label);
-            draw_bold_text(rend, 52, y, full_line, FG_YELLOW_R, FG_YELLOW_G, FG_YELLOW_B);
+            draw_bold_text(rend, sx + 14, y, "[X]", FG_YELLOW_R, FG_YELLOW_G, FG_YELLOW_B);
+            draw_bold_text(rend, sx + 78, y, opt_label, FG_WHITE_R, FG_WHITE_G, FG_WHITE_B);
         } else {
-            snprintf(full_line, sizeof(full_line), "[ ] %s", opt_label);
-            draw_bold_text(rend, 52, y, full_line, FG_WHITE_R, FG_WHITE_G, FG_WHITE_B);
+            draw_bold_text(rend, sx + 14, y, "[ ]", FG_NAVY_R, FG_NAVY_G, FG_NAVY_B);
+            draw_bold_text(rend, sx + 78, y, opt_label, FG_BLACK_R, FG_BLACK_G, FG_BLACK_B);
         }
     }
 
-    /* 1-line soft yellow description before the buttons */
-    if (n > 0 && page->options[page->selected_idx].desc[0] != '\0') {
-        expand_vars(page->options[page->selected_idx].desc, buf, sizeof(buf));
-        draw_vga_text(rend, 48, 344, buf, FG_DESC_R, FG_DESC_G, FG_DESC_B);
-    }
+    /* 3D Horizontal Divider above the Action Buttons */
+    int div_y = dy + 308;
+    SDL_SetRenderDrawColor(rend, DLG_DARK_R, DLG_DARK_G, DLG_DARK_B, 255);
+    SDL_Rect div_top = { dx + 10, div_y, dw - 20, 2 };
+    SDL_RenderFillRect(rend, &div_top);
+    SDL_SetRenderDrawColor(rend, DLG_LIGHT_R, DLG_LIGHT_G, DLG_LIGHT_B, 255);
+    SDL_Rect div_bot = { dx + 10, div_y + 2, dw - 20, 2 };
+    SDL_RenderFillRect(rend, &div_bot);
 
-    /* Bottom Action Buttons: [ OK ]  [ Back ]  [ Exit ] */
-    int btn_y = 392;
-    int btn_h = 46;
-    draw_action_button(rend, 48,  btn_y, 110, btn_h, "OK",   action_idx == 0, 0);
-    draw_action_button(rend, 180, btn_y, 120, btn_h, "Back", action_idx == 1, !can_go_back);
-    draw_action_button(rend, 322, btn_y, 120, btn_h, "Exit", action_idx == 2, 0);
+    /* Bottom Action Buttons: < OK >  < Back >  < Exit > */
+    int btn_y = dy + 324;
+    int btn_h = 38;
+    draw_ncurses_button(rend, dx + 54,  btn_y, 136, btn_h, "OK",   action_idx == 0, 0);
+    draw_ncurses_button(rend, dx + 212, btn_y, 136, btn_h, "Back", action_idx == 1, !can_go_back);
+    draw_ncurses_button(rend, dx + 370, btn_y, 136, btn_h, "Exit", action_idx == 2, 0);
 
     SDL_RenderPresent(rend);
 }
 
-/* Render Progress Bar Screen */
+/* Render Progress Bar Screen (`dialog --gauge`) */
 static void render_progress_flow(SDL_Renderer *rend, ProgressFlow *flow, int pct, const char *status_str) {
-    draw_mockup_header(rend);
+    int dx = 44, dy = 86, dw = 540, dh = 280;
+    draw_ncurses_window(rend, dx, dy, dw, dh, flow->box_title);
 
     char buf[MAX_STR];
     expand_vars(flow->line1, buf, sizeof(buf));
-    draw_vga_centered(rend, 320, 120, buf, FG_WHITE_R, FG_WHITE_G, FG_WHITE_B);
+    draw_vga_bold_centered(rend, dx + dw / 2, dy + 42, buf, FG_BLACK_R, FG_BLACK_G, FG_BLACK_B);
 
     expand_vars(flow->line2, buf, sizeof(buf));
-    draw_vga_centered(rend, 320, 142, buf, FG_WHITE_R, FG_WHITE_G, FG_WHITE_B);
+    draw_vga_centered(rend, dx + dw / 2, dy + 68, buf, FG_BLACK_R, FG_BLACK_G, FG_BLACK_B);
 
     expand_vars(flow->line3, buf, sizeof(buf));
-    draw_vga_centered(rend, 320, 164, buf, FG_WHITE_R, FG_WHITE_G, FG_WHITE_B);
+    draw_vga_centered(rend, dx + dw / 2, dy + 92, buf, FG_BLACK_R, FG_BLACK_G, FG_BLACK_B);
 
-    int bx = 58, by = 224, bw = 524, bh = 96;
-    draw_double_box(rend, bx, by, bw, bh);
-
-    expand_vars(flow->box_title, buf, sizeof(buf));
-    draw_vga_text(rend, bx + 14, by + 10, buf, FG_WHITE_R, FG_WHITE_G, FG_WHITE_B);
-
-    char pct_str[16];
-    snprintf(pct_str, sizeof(pct_str), "%d%%", pct);
-    draw_vga_centered(rend, 320, by + 30, pct_str, FG_WHITE_R, FG_WHITE_G, FG_WHITE_B);
-
-    int px = 108, py = by + 54, pw = 424, ph = 26;
-    SDL_SetRenderDrawColor(rend, FG_WHITE_R, FG_WHITE_G, FG_WHITE_B, 255);
-    SDL_Rect pbox = { px, py, pw, ph };
-    SDL_RenderDrawRect(rend, &pbox);
+    /* Sunken 3D Gauge Bar */
+    int gx = dx + 36;
+    int gy = dy + 140;
+    int gw = dw - 72;
+    int gh = 38;
+    draw_3d_bevel(rend, gx, gy, gw, gh, 0);
 
     if (pct > 0) {
         if (pct > 100) pct = 100;
-        int max_fill = pw - 8;
+        int max_fill = gw - 8;
         int fill_w = (max_fill * pct) / 100;
         if (fill_w > 0) {
-            SDL_SetRenderDrawColor(rend, FG_YELLOW_R, FG_YELLOW_G, FG_YELLOW_B, 255);
-            SDL_Rect fill = { px + 4, py + 4, fill_w, ph - 8 };
+            SDL_SetRenderDrawColor(rend, HL_NAVY_R, HL_NAVY_G, HL_NAVY_B, 255);
+            SDL_Rect fill = { gx + 4, gy + 4, fill_w, gh - 8 };
             SDL_RenderFillRect(rend, &fill);
         }
     }
 
-    /* Bottom Gray Status Bar during copying */
-    SDL_SetRenderDrawColor(rend, BAR_GRAY_R, BAR_GRAY_G, BAR_GRAY_B, 255);
-    SDL_Rect bar = { 0, 454, SCREEN_W, 26 };
-    SDL_RenderFillRect(rend, &bar);
+    char pct_str[16];
+    snprintf(pct_str, sizeof(pct_str), "%d%%", pct);
+    int pct_x = gx + (gw - (int)strlen(pct_str) * 16) / 2;
+    int pct_y = gy + (gh - 16) / 2;
+    if (pct >= 52) {
+        draw_bold_text(rend, pct_x, pct_y, pct_str, FG_YELLOW_R, FG_YELLOW_G, FG_YELLOW_B);
+    } else {
+        draw_bold_text(rend, pct_x, pct_y, pct_str, FG_NAVY_R, FG_NAVY_G, FG_NAVY_B);
+    }
 
     if (status_str && status_str[0]) {
         char status_exp[MAX_STR];
         expand_vars(status_str, status_exp, sizeof(status_exp));
-        int div_x = 410;
-        SDL_SetRenderDrawColor(rend, 0, 0, 0, 255);
-        SDL_Rect vline = { div_x, 454, 2, 26 };
-        SDL_RenderFillRect(rend, &vline);
-        draw_vga_text(rend, div_x + 6, 459, status_exp, 0, 0, 0);
+        draw_vga_bold_centered(rend, dx + dw / 2, dy + 206, status_exp, FG_NAVY_R, FG_NAVY_G, FG_NAVY_B);
     }
 
     SDL_RenderPresent(rend);
@@ -732,26 +813,39 @@ static int execute_progress_flow(SDL_Renderer *rend, ProgressFlow *flow) {
     return all_ok;
 }
 
-/* Render Completion Screen matching the clean layout + [ OK ] button */
+/* Render Completion Screen (`dialog --msgbox`) */
 static void render_completion_flow(SDL_Renderer *rend, ProgressFlow *flow, int ok_status) {
-    draw_mockup_header(rend);
+    int dx = 44, dy = 68, dw = 540, dh = 330;
+    const char *title = ok_status ? flow->complete_title : "Setup Error";
+    draw_ncurses_window(rend, dx, dy, dw, dh, title);
+
+    int sx = dx + 26;
+    int sy = dy + 42;
+    int sw = dw - 52;
+    int sh = 192;
+    draw_3d_bevel(rend, sx, sy, sw, sh, 0);
 
     char buf[MAX_STR];
     if (ok_status) {
-        expand_vars(flow->complete_title, buf, sizeof(buf));
-        draw_bold_text(rend, 48, 118, buf, FG_YELLOW_R, FG_YELLOW_G, FG_YELLOW_B);
-
-        int start_y = 172;
+        int start_y = sy + 22;
         for (int i = 0; i < flow->num_complete_lines; i++) {
             expand_vars(flow->complete_lines[i], buf, sizeof(buf));
-            draw_vga_text(rend, 48, start_y + (i * 32), buf, FG_WHITE_R, FG_WHITE_G, FG_WHITE_B);
+            draw_vga_bold(rend, sx + 18, start_y + (i * 34), buf, FG_BLACK_R, FG_BLACK_G, FG_BLACK_B);
         }
     } else {
-        draw_bold_text(rend, 48, 118, "Setup Error", FG_YELLOW_R, FG_YELLOW_G, FG_YELLOW_B);
-        draw_vga_text(rend, 48, 172, "One or more installation commands failed.", FG_WHITE_R, FG_WHITE_G, FG_WHITE_B);
+        draw_vga_bold(rend, sx + 18, sy + 30, "One or more installation commands failed.", FG_BLACK_R, FG_BLACK_G, FG_BLACK_B);
     }
 
-    draw_action_button(rend, 48, 392, 110, 46, "OK", 1, 0);
+    /* 3D Horizontal Divider above < OK > */
+    int div_y = dy + 254;
+    SDL_SetRenderDrawColor(rend, DLG_DARK_R, DLG_DARK_G, DLG_DARK_B, 255);
+    SDL_Rect div_top = { dx + 10, div_y, dw - 20, 2 };
+    SDL_RenderFillRect(rend, &div_top);
+    SDL_SetRenderDrawColor(rend, DLG_LIGHT_R, DLG_LIGHT_G, DLG_LIGHT_B, 255);
+    SDL_Rect div_bot = { dx + 10, div_y + 2, dw - 20, 2 };
+    SDL_RenderFillRect(rend, &div_bot);
+
+    draw_ncurses_button(rend, dx + (dw - 136) / 2, dy + 270, 136, 38, "OK", 1, 0);
     SDL_RenderPresent(rend);
 }
 
@@ -800,7 +894,7 @@ int main(int argc, char *argv[]) {
         joy = SDL_JoystickOpen(0);
     }
 
-    SDL_Window *win = SDL_CreateWindow("Windows XP Setup",
+    SDL_Window *win = SDL_CreateWindow("playOS Setup",
                                        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                                        SCREEN_W, SCREEN_H,
                                        SDL_WINDOW_SHOWN | SDL_WINDOW_FULLSCREEN);
@@ -863,16 +957,16 @@ int main(int argc, char *argv[]) {
             }
         } else if (act == ACT_TRIGGER) {
             if (action_idx == 2) {
-                /* [ Exit ] triggered */
+                /* < Exit > triggered */
                 quit_requested = 1;
             } else if (action_idx == 1 && can_go_back) {
-                /* [ Back ] triggered */
+                /* < Back > triggered */
                 cur_page_idx = page_history[--history_top];
                 action_idx = 0;
                 SDL_Delay(120);
                 drain_all_inputs();
             } else if (action_idx == 0 && page->num_options > 0) {
-                /* [ OK ] triggered: execute current Option */
+                /* < OK > triggered: execute current Option */
                 WizardOption *opt = &page->options[page->selected_idx];
 
                 if (page->var[0] != '\0') {

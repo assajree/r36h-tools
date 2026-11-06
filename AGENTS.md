@@ -42,6 +42,7 @@ d:\me\r36h\tools\
 ├── AGENTS.md                         <-- Master workspace rules & specifications
 ├── ARCHETYPES.md                     <-- Standardized tool archetypes & layout rules
 ├── PLAYFE_MENU_GUIDE.md              <-- playOS 4.0 Frontend (playfe) menu & cover art guide
+├── NCURSES_TUI_GUIDE.md              <-- Genuine Linux ncurses TUI (dialog + fb0_mirror) guide
 ├── mercusys_wifi/                    <-- Wi-Fi Driver & Persistence Tool
 │   ├── Install_Mercusys_WiFi.sh     <-- All-in-one standalone installer
 │   ├── Uninstall_Mercusys_WiFi.sh   <-- Clean uninstaller script
@@ -108,21 +109,24 @@ d:\me\r36h\tools\
 │       ├── auto_screen_off_daemon.py <-- Python idle listener (60s timeout)
 │       └── auto-screen-off.service  <-- Systemd background service unit
 ├── power_button/                     <-- Power Button Hold-to-Shutdown Daemon
-│   ├── Setup_UI.sh                  <-- Interactive Windows XP Setup UI Wizard (SDL2)
+│   ├── Setup_UI.sh                  <-- Interactive Setup UI Wizard (SDL2)
 │   ├── Install_Power_Button.sh      <-- Standalone installer & service activator
 │   ├── Status_Power_Button.sh       <-- Status inspector (PID, RAM, device, logs)
 │   ├── Uninstall_Power_Button.sh    <-- Clean uninstaller & teardown script
 │   ├── README.txt                   <-- User guide & instructions
 │   └── daemon/                      <-- Internal daemon subfolder
-│       ├── xp_setup_ui              <-- Standalone ARM64 Universal Setup UI binary
+│       ├── setup_ui                 <-- Standalone ARM64 Universal Setup UI binary
 │       ├── countdown_ui             <-- Standalone ARM64 Countdown Overlay binary
 │       ├── power_button_daemon.py   <-- Python PMIC event listener (3s hold trigger)
 │       └── power-button-daemon.service <-- Systemd background service unit
-├── xp_setup_ui/                      <-- Universal Windows XP Setup UI Engine (Reusable)
-│   ├── xp_setup_ui.c                <-- Direct SDL2 KMSDRM Universal Setup UI source
+├── setup_ui/                         <-- Universal Setup UI & Framebuffer Mirror Engine (SDL2 KMSDRM)
+│   ├── setup_ui.c                   <-- Direct SDL2 KMSDRM Universal Setup UI source
+│   ├── fb0_mirror.c                 <-- /dev/fb0 (/dev/tty1) to KMSDRM mirror & TIOCSTI input bridge
 │   ├── countdown_ui.c               <-- Direct SDL2 KMSDRM Countdown Overlay source
-│   ├── xp_setup_ui                  <-- Pre-compiled ARM64 binary for any tool
-│   ├── Demo_Setup.sh                <-- Template launcher script with inline config
+│   ├── setup_ui                     <-- Pre-compiled ARM64 Setup UI binary for any tool
+│   ├── fb0_mirror                   <-- Pre-compiled ARM64 /dev/fb0 mirror binary for real dialog TUIs
+│   ├── Demo_Setup.sh                <-- Template launcher script for setup_ui (inline config)
+│   ├── Demo_Dialog_TUI.sh           <-- Template launcher script for real Linux dialog + fb0_mirror
 │   └── README.txt                   <-- Integration & customization manual
 ├── rtl/                              <-- Realtek firmware repository (dArkOS origin)
 └── XNL RTL8188FTV/                   <-- Reference RTL8188FU driver archive
@@ -215,17 +219,18 @@ To keep the user-facing workspace and `/roms/tools/` clean and intuitive, all to
 
 ---
 
-### 4.2 Universal Setup UI Engine (`xp_setup_ui`) Usage Policy
+### 4.2 Universal Setup UI Engine (`setup_ui`) Usage Policy
 
-The workspace provides a reusable C/SDL2 KMSDRM graphical setup wizard engine in [`xp_setup_ui/`](file:///d:/me/r36h/tools/xp_setup_ui/).
+The workspace provides a reusable C/SDL2 KMSDRM graphical setup wizard engine in [`setup_ui/`](file:///d:/me/r36h/tools/setup_ui/).
 
-* **When to Use `xp_setup_ui`:**
-  * Use `xp_setup_ui` **ONLY** when the user explicitly requests a graphical UI, Setup Wizard, or controller-navigable options menu (`UP/DOWN` to select options, `LEFT/RIGHT` to select `[ OK ]` / `[ Back ]` / `[ Exit ]`, and `A` or `B` to confirm).
+* **When to Use `setup_ui`:**
+  * Use `setup_ui` **ONLY** when the user explicitly requests a graphical UI, Setup Wizard, or controller-navigable options menu (`UP/DOWN` to select options, `LEFT/RIGHT` to select `[ OK ]` / `[ Back ]` / `[ Exit ]`, and `A` or `B` to confirm).
   * By default, standard installers (`Install_<Tool>.sh`) should remain simple, non-interactive shell scripts unless a UI/Wizard is requested.
 * **How to Package & Integrate (`No Recompilation Needed`):**
-  * Copy **only** the pre-compiled ARM64 binary [`xp_setup_ui/xp_setup_ui`](file:///d:/me/r36h/tools/xp_setup_ui/xp_setup_ui) into the target tool's internal subfolder (`<tool_name>/daemon/xp_setup_ui` or `<tool_name>/app/xp_setup_ui`).
-  * **Never** clutter individual tool folders with `.c` source files (`xp_setup_ui.c`, `countdown_ui.c`). All C source code is maintained centrally in [`xp_setup_ui/`](file:///d:/me/r36h/tools/xp_setup_ui/).
-  * Create the launcher script (e.g., `Setup_UI.sh` based on [`xp_setup_ui/Demo_Setup.sh`](file:///d:/me/r36h/tools/xp_setup_ui/Demo_Setup.sh)) that pauses `FindManager|playfe` (`pkill -STOP -f "FindManager|playfe"`), pipes the custom `header`, `[page]`, and `[progress]` configuration block to `xp_setup_ui - << 'EOF'`, and resumes `FindManager|playfe` (`pkill -CONT -f "FindManager|playfe"`) on exit.
+  * Copy **only** the pre-compiled ARM64 binary [`setup_ui/setup_ui`](file:///d:/me/r36h/tools/setup_ui/setup_ui) into the target tool's internal subfolder (`<tool_name>/daemon/setup_ui` or `<tool_name>/app/setup_ui`).
+  * **Never** clutter individual tool folders with `.c` source files (`setup_ui.c`, `countdown_ui.c`). All C source code is maintained centrally in [`setup_ui/`](file:///d:/me/r36h/tools/setup_ui/).
+  * Create the launcher script (e.g., `Setup_UI.sh` based on [`setup_ui/Demo_Setup.sh`](file:///d:/me/r36h/tools/setup_ui/Demo_Setup.sh)) that pauses `FindManager|playfe` (`pkill -STOP -f "FindManager|playfe"`), pipes the custom `header`, `[page]`, and `[progress]` configuration block to `setup_ui - << 'EOF'`, and resumes `FindManager|playfe` (`pkill -CONT -f "FindManager|playfe"`) on exit.
+* **Bitmap Font Bit-Order Rule:** When embedding or rendering 8x8 bitmap fonts in custom SDL2 KMSDRM binaries, ensure bit extraction matches the array's endianness (e.g. `setup_ui.c` uses LSB-first `font8x8_basic`, requiring `bits & (1 << col)`). See [Section 7.7](#7-embedded-bitmap-font-bit-order--horizontal-mirroring-lsb-vs-msb-in-sdl2-ui).
 
 ---
 
@@ -257,8 +262,8 @@ When authoring, modifying, or packaging tools for playOS on R36H, AI agents **MU
 5. **Do Not Automatically Generate ZIP Archives:**
    * Do **NOT** automatically compress folders or create `.zip` archives unless explicitly requested by the user. Keep tools maintained as clean, direct source directories and files within the workspace.
 
-6. **Keep C Source Code in `xp_setup_ui/` and Binaries in Tool Subfolders:**
-   * Only use `xp_setup_ui` when the user explicitly asks for a graphical Setup UI or controller-selectable menu. When used, place the compiled `xp_setup_ui` binary inside the tool's subfolder (`daemon/` or `app/`) and keep all `.c` source files in [`xp_setup_ui/`](file:///d:/me/r36h/tools/xp_setup_ui/).
+6. **Keep C Source Code in `setup_ui/` and Binaries in Tool Subfolders:**
+   * Only use `setup_ui` when the user explicitly asks for a graphical Setup UI or controller-selectable menu. When used, place the compiled `setup_ui` binary inside the tool's subfolder (`daemon/` or `app/`) and keep all `.c` source files in [`setup_ui/`](file:///d:/me/r36h/tools/setup_ui/).
 
 7. **Follow `playfe` Naming & Subfolder Hiding Rules in `/roms/tools/`:**
    * **Stem-Matching Rule (Menu Tools — Archetypes 1 & 3):** For any tool that places a top-level launcher `.sh` in `/roms/tools/`, its subfolder name (`<tool_name>/`) normalized to lowercase alphanumeric (`[a-z0-9]`, length `> 4`) **MUST** be a substring of the top-level `.sh` filename stem so `playfe` automatically hides the subfolder from the menu (e.g., `/roms/tools/Screen_Off.sh` (`screenoff`) auto-hides `/roms/tools/screen_off/`; `/roms/tools/Start_Web_Terminal.sh` (`startwebterminal`) auto-hides `/roms/tools/web_terminal/`).
@@ -441,10 +446,41 @@ Key technical findings and platform quirks discovered on physical R36H running p
 * **Launch Quirks (`stdin` & Button Release Debounce):** `playfe` runs scripts with `stdin` (`fd 0`) attached to `/dev/null` (so `read` subshells inside `wait -n` must append `|| sleep 86400`), and scripts that immediately listen for raw `/dev/input/event*` wake events must `sleep 0.6` first to ignore the `B` launch button release event.
 * **Full Reference:** See [`PLAYFE_MENU_GUIDE.md`](file:///d:/me/r36h/tools/PLAYFE_MENU_GUIDE.md) for the complete architecture and installer templates.
 
-### 6. `playOS Terminal` (`FindManager`) Output Buffering & Direct SDL2 KMSDRM UI
+### 6. `playOS Terminal` (`FindManager`) Output Buffering, `setup_ui`, & Real `dialog` TUI (`fb0_mirror`)
 * **How `FindManager` Runs Scripts:** The built-in `playOS Terminal` app (`/opt/FindManager_Data/FindManager`) executes scripts via `popen(cmd, "r")` in a background thread (`terminalWorker`), rendering only `"Running.."` via NanoVG/GLES2 at 60 FPS until the child process exits (`pclose`), and only then prints the collected `stdout` buffer as plain text (without ANSI escape code parsing).
-* **Why Text TUIs Cannot Render Live inside `FindManager`:** Writing to `stdout` is buffered until process exit, and writing to `/dev/tty1` is covered by `FindManager`'s GLES2 DRM surface.
-* **Standard Solution (`xp_setup_ui`):** When an interactive controller-driven UI is requested, freeze `FindManager|playfe` (`pkill -STOP -f "FindManager|playfe"`), launch [`xp_setup_ui`](file:///d:/me/r36h/tools/xp_setup_ui/xp_setup_ui) (which renders directly to KMSDRM via SDL2 and reads `/dev/input/event*` for D-Pad `544..547` and buttons `304`/`305`), print a plain-text summary to `stdout` on completion, and resume `FindManager|playfe` (`pkill -CONT -f "FindManager|playfe"`).
+* **Why Text TUIs Cannot Render Live inside `FindManager`:** Writing to `stdout` is buffered until process exit, and writing to `/dev/tty1` renders into `/dev/fb0` (`DMA addr: 0x00000000`), whereas the Rockchip VOP hardware (`ff460000.vop`, `win1-0`) remains pointed at `FindManager`/`playfe`'s DRM GEM buffer (`addr: 0x0012c000`).
+* **Standard Solution A — Declarative Setup Wizard ([`setup_ui`](file:///d:/me/r36h/tools/setup_ui/setup_ui)):** Freeze `FindManager`/`playfe` (`killall -STOP FindManager playfe`), launch `setup_ui` (which renders directly to KMSDRM via SDL2 and reads `/dev/input/event*` for D-Pad `544..547` and buttons `304`/`305`), print a plain-text summary to `stdout` on completion, and resume (`killall -CONT FindManager playfe`).
+* **Standard Solution B — Genuine Linux ncurses `dialog` / `whiptail` ([`fb0_mirror`](file:///d:/me/r36h/tools/setup_ui/fb0_mirror)):**
+  * Run `fb0_mirror` in the background while executing `dialog` on `/dev/tty1` (`--output-fd 3 3>&1 < /dev/tty1 > /dev/tty1 2>/dev/tty1`).
+  * `fb0_mirror` reads `/dev/fb0` via `pread()` into heap RAM (avoiding Mali GLES2 `VM_IO` `mmap_sem` deadlocks), uploads it as an opaque `SDL_PIXELFORMAT_RGB888` texture (`SDL_BLENDMODE_NONE` to ignore `fbcon`'s `Alpha = 0`), detaches SDL2's internal `/dev/tty1` reader (`dup2` to `/dev/null` + `KDSKBMODE = K_UNICODE` + `KDSETMODE = KD_TEXT` so `SDL_EVDEV_kbd` cannot steal keystrokes), and injects R36H gamepad presses into `/dev/tty1` via `ioctl(tty_fd, TIOCSTI, &c)`.
+  * **Full Reference:** See [`NCURSES_TUI_GUIDE.md`](file:///d:/me/r36h/tools/NCURSES_TUI_GUIDE.md) and [`setup_ui/Demo_Dialog_TUI.sh`](file:///d:/me/r36h/tools/setup_ui/Demo_Dialog_TUI.sh).
+
+### 7. Embedded Bitmap Font Bit-Order & Horizontal Mirroring (LSB vs. MSB in SDL2 UI)
+* **The Symptom:** In custom C/SDL2 KMSDRM graphical interfaces (such as `setup_ui`), text can appear horizontally mirrored / flipped (e.g., character 'B' has its straight backbone on the right side and rounded curves facing left; 'C' has its opening facing left instead of right).
+* **The Root Cause (LSB-First vs. MSB-First Mismatch):**
+  * Embedded bitmap font headers (such as Daniel Hepper's widely used `font8x8_basic`) store individual scanline rows as 8-bit unsigned chars (`uint8_t`), where **Bit 0** corresponds to the **leftmost pixel** (Column 0) and **Bit 7** corresponds to the **rightmost pixel** (Column 7).
+  * If the character rendering loop extracts bits using an MSB-first pattern:
+    ```c
+    /* ❌ BUG: MSB-first extraction on LSB-first font table -> Horizontal Mirroring */
+    if (bits & (0x80 >> col)) {
+        SDL_Rect r = { x + col * scale_x, y + row * scale_y, scale_x, scale_y };
+        SDL_RenderFillRect(rend, &r);
+    }
+    ```
+    `col = 0` evaluates Bit 7 (rightmost pixel) and draws it at the leftmost coordinate, completely mirroring every character along the vertical axis.
+  * The correct extraction loop for LSB-first font arrays:
+    ```c
+    /* ✅ CORRECT: LSB-first extraction matching font8x8_basic */
+    if (bits & (1 << col)) {
+        SDL_Rect r = { x + col * scale_x, y + row * scale_y, scale_x, scale_y };
+        SDL_RenderFillRect(rend, &r);
+    }
+    ```
+* **Quick Rule of Thumb to Detect Table Bit-Order:**
+  * Inspect the definition of uppercase `'C'` (ASCII 67):
+    * If `'C'` contains `{0x3C, 0x66, 0x03, 0x03, 0x03, 0x66, 0x3C, 0x00}`: `0x03` (`00000011b`) has its 1s in lower bits (bits 0 and 1) representing the left vertical spine of the 'C'. This table is **LSB-first** and **MUST** use `(bits & (1 << col))`.
+    * If `'C'` contains `{0x3C, 0x66, 0xC0, 0xC0, 0xC0, 0x66, 0x3C, 0x00}`: `0xC0` (`11000000b`) has its 1s in upper bits (bits 7 and 6) representing the left vertical spine of the 'C'. This table is **MSB-first** and **MUST** use `(bits & (0x80 >> col))`.
+
 
 
 

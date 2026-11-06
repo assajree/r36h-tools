@@ -1,7 +1,7 @@
 #!/bin/bash
 # ==============================================================================
-# Tool: Power Button Hold-to-Shutdown Setup Wizard (Universal Windows XP UI)
-# Description: Uses the reusable xp_setup_ui binary (Direct SDL2 KMSDRM)
+# Tool: Power Button Hold-to-Shutdown Setup Wizard (Universal Setup UI)
+# Description: Uses the reusable setup_ui binary (Direct SDL2 KMSDRM)
 #              located in the daemon/ subfolder, configured via inline
 #              INI-style blocks for header, step_name, options, and progress.
 # ==============================================================================
@@ -22,16 +22,22 @@ else
     export DAEMON_DIR="$SCRIPT_DIR"
 fi
 
-UI_BIN="$DAEMON_DIR/xp_setup_ui"
-UI_SRC="$DAEMON_DIR/xp_setup_ui.c"
+if [ -x "$DAEMON_DIR/setup_ui" ]; then
+    UI_BIN="$DAEMON_DIR/setup_ui"
+elif [ -x "$DAEMON_DIR/xp_setup_ui" ]; then
+    UI_BIN="$DAEMON_DIR/xp_setup_ui"
+else
+    UI_BIN="$DAEMON_DIR/setup_ui"
+fi
+UI_SRC="$DAEMON_DIR/setup_ui.c"
 
 # Ensure frontend / FindManager are always resumed on exit
 cleanup_resume() {
-    pkill -CONT -f "FindManager|playfe" 2>/dev/null || true
+    killall -CONT FindManager playfe 2>/dev/null || true
 }
 trap cleanup_resume EXIT INT TERM
 
-# Auto-compile xp_setup_ui binary inside daemon/ subfolder if needed
+# Auto-compile setup_ui binary inside daemon/ subfolder if needed
 if [ -f "$UI_SRC" ]; then
     if [ ! -x "$UI_BIN" ] || [ "$UI_SRC" -nt "$UI_BIN" ]; then
         gcc -O2 "$UI_SRC" -lSDL2 -o "$UI_BIN" 2>/dev/null || true
@@ -40,15 +46,15 @@ if [ -f "$UI_SRC" ]; then
 fi
 
 if [ ! -x "$UI_BIN" ]; then
-    echo "[!] Error: Cannot find or compile xp_setup_ui binary in $DAEMON_DIR"
+    echo "[!] Error: Cannot find or compile setup_ui binary in $DAEMON_DIR"
     exit 1
 fi
 
-# Pause playfe / FindManager so they stop swapping KMSDRM buffers while XP UI is active
-pkill -STOP -f "FindManager|playfe" 2>/dev/null || true
+# Pause playfe / FindManager so they stop swapping KMSDRM buffers while UI is active
+killall -STOP FindManager playfe 2>/dev/null || true
 
 # ==============================================================================
-# Launch Universal Windows XP Setup UI Engine with Custom Multi-Page Config
+# Launch Universal Setup UI Engine with Custom Multi-Page Config
 # Controls:
 #   - UP / DOWN    : Select Option ([X])
 #   - LEFT / RIGHT : Select Action Button ([ OK ] / [ Back ] / [ Exit ])
@@ -131,7 +137,7 @@ complete_line = Default playOS power button behavior is restored.
 EOF
 
 # Resume playfe / FindManager immediately
-pkill -CONT -f "FindManager|playfe" 2>/dev/null || true
+killall -CONT FindManager playfe 2>/dev/null || true
 
 # Hide power_button's own .sh scripts from playfe TOOLS menu via gamelist.xml
 if command -v python3 >/dev/null 2>&1; then
