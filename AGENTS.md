@@ -42,11 +42,16 @@ d:\me\r36h\tools\
 ├── AGENTS.md                         <-- Master workspace rules & specifications
 ├── mercusys_wifi/                    <-- Wi-Fi Driver & Persistence Tool
 │   ├── Install_Mercusys_WiFi.sh     <-- All-in-one standalone installer
-│   ├── Repair_Mercusys_WiFi.sh      <-- Diagnostic & repair tool
-│   ├── 8188eu.ko                     <-- Compiled 4.4.189 kernel module
-│   ├── rtl8188eufw.bin               <-- Realtek firmware microcode
+│   ├── Uninstall_Mercusys_WiFi.sh   <-- Clean uninstaller script
 │   ├── TECHNICAL_NOTES.md            <-- Deep hardware quirks & findings
-│   └── README.txt                    <-- User guide
+│   ├── README.txt                    <-- User guide
+│   ├── driver/                       <-- Kernel module & firmware binary subfolder
+│   │   ├── 8188eu.ko                 <-- Compiled 4.4.189 kernel module
+│   │   └── rtl8188eufw.bin           <-- Realtek firmware microcode
+│   └── tools/                        <-- Diagnostics & helper scripts subfolder
+│       ├── Repair_Mercusys_WiFi.sh  <-- Diagnostic & repair tool
+│       ├── Check_WiFi_Signal.sh     <-- Wi-Fi signal & status monitor
+│       └── *.sh                      <-- Individual helper scripts
 ├── web_filemanager/                  <-- Wireless Web File Browser (Filebrowser)
 │   ├── filebrowser                   <-- ARM64 standalone binary
 │   ├── Install_Web_FileManager.sh   <-- Setup script

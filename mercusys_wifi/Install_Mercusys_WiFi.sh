@@ -14,8 +14,10 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-FW_SRC="${SCRIPT_DIR}/rtl8188eufw.bin"
-KO_SRC="${SCRIPT_DIR}/8188eu.ko"
+FW_SRC="${SCRIPT_DIR}/driver/rtl8188eufw.bin"
+[ ! -f "$FW_SRC" ] && FW_SRC="${SCRIPT_DIR}/rtl8188eufw.bin"
+KO_SRC="${SCRIPT_DIR}/driver/8188eu.ko"
+[ ! -f "$KO_SRC" ] && KO_SRC="${SCRIPT_DIR}/8188eu.ko"
 KERNEL_VER="$(uname -r)"
 DEST_MOD_DIR="/lib/modules/${KERNEL_VER}/kernel/drivers/net/wireless/rockchip_wlan/rtl8188eu"
 DEST_FW_DIR="/lib/firmware/rtlwifi"
@@ -41,13 +43,13 @@ sleep 1
 # ------------------------------------------------------------------------------
 # 1. ตรวจสอบความสมบูรณ์ของไฟล์ต้นทาง
 # ------------------------------------------------------------------------------
-print_msg "\n[1/5] ตรวจสอบไฟล์ติดตั้งภายในโฟลเดอร์..."
+print_msg "\n[1/5] ตรวจสอบไฟล์ติดตั้งภายในโฟลเดอร์ driver/..."
 if [ ! -f "$FW_SRC" ]; then
-    print_msg " [X] ไม่พบไฟล์ rtl8188eufw.bin ที่ ${SCRIPT_DIR}"
+    print_msg " [X] ไม่พบไฟล์ rtl8188eufw.bin ที่ ${SCRIPT_DIR}/driver/"
     exit 1
 fi
 if [ ! -f "$KO_SRC" ]; then
-    print_msg " [X] ไม่พบไฟล์ 8188eu.ko ที่ ${SCRIPT_DIR}"
+    print_msg " [X] ไม่พบไฟล์ 8188eu.ko ที่ ${SCRIPT_DIR}/driver/"
     exit 1
 fi
 print_msg " [✓] พบไฟล์ rtl8188eufw.bin และ 8188eu.ko ครบถ้วน"
