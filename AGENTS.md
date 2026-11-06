@@ -14,6 +14,8 @@ The goal is to provide reliable, plug-and-play, and offline-first tools that sea
 * **Linux Kernel Version:** `4.4.189`
 * **Target Display Console:** `/dev/tty1` (EmulationStation framebuffer / text console)
 * **SSH Access & Authentication:**
+  * **Status:** Fully supported. Agents can interact with the device directly via SSH (e.g. Python `paramiko` or OpenSSH).
+  * **IP Address:** Dynamic / User-provided (e.g. `192.168.1.205`). **Always ask the user for the current IP** if unknown or if connection fails.
   * **Port:** `22` (OpenSSH)
   * **Default User:** `ark`
   * **Default Password:** `ark`
@@ -41,98 +43,16 @@ The goal is to provide reliable, plug-and-play, and offline-first tools that sea
 d:\me\r36h\tools\
 ├── AGENTS.md                         <-- Master workspace rules & specifications
 ├── ARCHETYPES.md                     <-- Standardized tool archetypes & layout rules
+├── TOOLS_CATALOG.md                  <-- Complete tool catalog, status table, & detailed file tree
 ├── PLAYFE_MENU_GUIDE.md              <-- playOS 4.0 Frontend (playfe) menu & cover art guide
 ├── NCURSES_TUI_GUIDE.md              <-- Genuine Linux ncurses TUI (dialog + fb0_mirror) guide
-├── mercusys_wifi/                    <-- Wi-Fi Driver & Persistence Tool
-│   ├── Install_Mercusys_WiFi.sh     <-- All-in-one standalone installer
-│   ├── Uninstall_Mercusys_WiFi.sh   <-- Clean uninstaller script
-│   ├── TECHNICAL_NOTES.md            <-- Deep hardware quirks & findings
-│   ├── README.txt                    <-- User guide
-│   ├── driver/                       <-- Kernel module & firmware binary subfolder
-│   │   ├── 8188eu.ko                 <-- Compiled 4.4.189 kernel module
-│   │   └── rtl8188eufw.bin           <-- Realtek firmware microcode
-│   └── tools/                        <-- Diagnostics & helper scripts subfolder
-│       ├── Repair_Mercusys_WiFi.sh  <-- Diagnostic & repair tool
-│       ├── Check_WiFi_Signal.sh     <-- Wi-Fi signal & status monitor
-│       └── *.sh                      <-- Individual helper scripts
-├── web_filemanager/                  <-- Wireless Web File Browser (Filebrowser)
-│   ├── filebrowser                   <-- ARM64 standalone binary
-│   ├── Install_Web_FileManager.sh   <-- Setup script
-│   ├── Start_Web_FileManager.sh     <-- Launcher with on-screen IP display
-│   ├── Stop_Web_FileManager.sh      <-- Teardown script to reclaim RAM for games
-│   └── README.txt                    <-- User guide
-├── web_terminal/                     <-- Wireless Web Terminal (ttyd)
-│   ├── Install_Web_Terminal.sh      <-- Setup script
-│   ├── Uninstall_Web_Terminal.sh    <-- Clean uninstaller script
-│   ├── README.txt                    <-- User guide
-│   └── app/                          <-- Internal application subfolder
-│       ├── ttyd                      <-- ARM64 standalone binary
-│       ├── Start_Web_Terminal.sh     <-- Launcher with on-screen IP display
-│       └── Stop_Web_Terminal.sh      <-- Teardown script to reclaim RAM for games
-├── check_usb/                        <-- USB Hardware Diagnostics
-│   ├── check_usb.sh                 <-- lsusb & loaded module inspector
-│   └── check_usb_wait_power.sh      <-- Power / OTG diagnostic script
-├── speedtest/                        <-- Network Benchmark Utility (Ping/DL/UL)
-│   ├── speedtest.py                 <-- Bundled & patched speedtest CLI module
-│   ├── speedtest_runner.py          <-- Python UI runner & Thai display formatter
-│   ├── speedtest.sh                 <-- Dual-output launcher for EmulationStation & CLI
-│   ├── Install_Speedtest.sh         <-- Standalone installer for /roms/tools/ & PATH
-│   └── README.txt                   <-- User guide & instructions
-├── screenshot/                       <-- Framebuffer Screen Capture Utility & Hotkey Daemon
-│   ├── Install_Screenshot.sh        <-- Standalone installer (CLI & Systemd Daemon)
-│   ├── Status_Screenshot.sh         <-- Status inspector & realtime Button Tester
-│   ├── Uninstall_Screenshot.sh      <-- Clean uninstaller (removes daemon & CLI)
-│   ├── README.txt                   <-- User guide & instructions
-│   ├── app/                         <-- Internal application subfolder
-│   │   └── screenshot.sh            <-- CLI capture script (fbdev /dev/fb0)
-│   └── daemon/                      <-- Internal daemon subfolder
-│       ├── screenshot_daemon.py     <-- Python SELECT+Y listener with shutter flash
-│       └── screenshot-daemon.service <-- Systemd background service unit
-├── quick_tools/                      <-- Top-level Shortcut Utility (00_tools)
-│   ├── Install_Quick_Tools.sh       <-- Standalone installer for /roms/00_tools bind mount
-│   ├── Uninstall_Quick_Tools.sh     <-- Clean uninstaller for /roms/00_tools
-│   └── README.txt                   <-- User guide & instructions
-├── tools_menu/                       <-- playOS 4.0 TOOLS Menu Enabler (es_systems.cfg)
-│   ├── Install_Tools_Menu.sh        <-- Enables <name>tools</name> in es_systems.cfg & restarts playfe
-│   ├── Uninstall_Tools_Menu.sh      <-- Removes <name>tools</name> from es_systems.cfg
-│   └── README.txt                   <-- User guide & instructions
-├── screen_off/                       <-- Screen Preserver / Backlight Shutoff Utility
-│   ├── Install_Screen_Off.sh        <-- Standalone installer for /roms/tools/ & PATH
-│   ├── Uninstall_Screen_Off.sh      <-- Clean uninstaller for full Screen Off suite
-│   ├── Setup_Auto_Screen_Off.sh     <-- One-click setup for Auto Screen Off (1 min idle)
-│   ├── Status_Auto_Screen_Off.sh    <-- Status inspector (PID, RAM, service status, logs)
-│   ├── Uninstall_Auto_Screen_Off.sh <-- Teardown script for Auto Screen Off daemon only
-│   ├── README.txt                   <-- User guide & instructions
-│   ├── app/                         <-- Internal application subfolder
-│   │   └── Screen_Off.sh            <-- Dual-output screen off & dual-input wake launcher
-│   └── daemon/                      <-- Auto screen off daemon subfolder
-│       ├── auto_screen_off_daemon.py <-- Python idle listener (60s timeout)
-│       └── auto-screen-off.service  <-- Systemd background service unit
-├── power_button/                     <-- Power Button Hold-to-Shutdown Daemon
-│   ├── Setup_UI.sh                  <-- Interactive Setup UI Wizard (SDL2)
-│   ├── Install_Power_Button.sh      <-- Standalone installer & service activator
-│   ├── Status_Power_Button.sh       <-- Status inspector (PID, RAM, device, logs)
-│   ├── Uninstall_Power_Button.sh    <-- Clean uninstaller & teardown script
-│   ├── README.txt                   <-- User guide & instructions
-│   └── daemon/                      <-- Internal daemon subfolder
-│       ├── setup_ui                 <-- Standalone ARM64 Universal Setup UI binary
-│       ├── countdown_ui             <-- Standalone ARM64 Countdown Overlay binary
-│       ├── power_button_daemon.py   <-- Python PMIC event listener (3s hold trigger)
-│       └── power-button-daemon.service <-- Systemd background service unit
-├── setup_ui/                         <-- Universal Setup UI & Framebuffer Mirror Engine (SDL2 KMSDRM)
-│   ├── setup_ui.c                   <-- Direct SDL2 KMSDRM Universal Setup UI source
-│   ├── fb0_mirror.c                 <-- /dev/fb0 (/dev/tty1) to KMSDRM mirror & TIOCSTI input bridge
-│   ├── countdown_ui.c               <-- Direct SDL2 KMSDRM Countdown Overlay source
-│   ├── setup_ui                     <-- Pre-compiled ARM64 Setup UI binary for any tool
-│   ├── fb0_mirror                   <-- Pre-compiled ARM64 /dev/fb0 mirror binary for real dialog TUIs
-│   ├── Demo_Setup.sh                <-- Template launcher script for setup_ui (inline config)
-│   ├── Demo_Dialog_TUI.sh           <-- Template launcher script for real Linux dialog + fb0_mirror
-│   └── README.txt                   <-- Integration & customization manual
-├── rtl/                              <-- Realtek firmware repository (dArkOS origin)
-└── XNL RTL8188FTV/                   <-- Reference RTL8188FU driver archive
+├── LED_HARDWARE_GUIDE.md             <-- R36H Power/Status LED hardware architecture & sysfs guide
+└── WIFI_HARDWARE_GUIDE.md            <-- Realtek USB Wi-Fi (RTL8188EU) architecture & quirks guide
 ```
 
-> **Note on Tool Details:** Deep hardware specifics (such as RTL8188EU HAL ops, USB vendor IDs, and firmware hashes) are maintained in each tool's local documentation (e.g., [`mercusys_wifi/TECHNICAL_NOTES.md`](file:///d:/me/r36h/tools/mercusys_wifi/TECHNICAL_NOTES.md)).
+> [!NOTE] Master Tool Catalog & Hardware Guides
+> * The complete breakdown of all tools, their archetypes, playOS menu launcher integration, and full file trees are centrally maintained in **[`TOOLS_CATALOG.md`](file:///d:/me/r36h/tools/TOOLS_CATALOG.md)**.
+> * Deep hardware architecture and subsystem specifics are documented in central guides: [`LED_HARDWARE_GUIDE.md`](file:///d:/me/r36h/tools/LED_HARDWARE_GUIDE.md) and [`WIFI_HARDWARE_GUIDE.md`](file:///d:/me/r36h/tools/WIFI_HARDWARE_GUIDE.md).
 
 ---
 
@@ -241,11 +161,7 @@ When authoring, modifying, or packaging tools for playOS on R36H, AI agents **MU
 1. **Always Use Unix Line Endings (LF):**
    * All shell scripts (`.sh`), configuration files, and systemd units must be saved with Unix line feeds (`\n`), never Windows CRLF (`\r\n`). CRLF causes `\r: command not found` fatal errors on Linux.
 
-2. **No Pipe Character (`|`) in User Instructions:**
-   * The built-in on-screen terminal emulator on playOS does **NOT** provide a pipe (`|`) key.
-   * Never instruct the user to type piped commands (e.g., `cat file | grep ...`). Always encapsulate multi-step logic into an executable shell script and instruct the user to run `sudo bash /path/to/script.sh`.
-
-3. **Dual Output Pattern:**
+2. **Dual Output Pattern:**
    * When writing user-facing scripts for `/roms/tools/`, redirect or mirror output to `/dev/tty1`:
      ```bash
      {
@@ -255,19 +171,41 @@ When authoring, modifying, or packaging tools for playOS on R36H, AI agents **MU
      } > /dev/tty1 2>&1
      ```
 
-4. **Preserve Subdirectory Modular Documentation:**
+3. **Preserve Subdirectory Modular Documentation:**
    * Keep `AGENTS.md` clean and focused on general environment specifications, architecture, and coding standards.
    * Place tool-specific configuration manuals, wiring/chipset notes, or driver quirks inside the respective tool folder.
 
-5. **Do Not Automatically Generate ZIP Archives:**
+4. **Do Not Automatically Generate ZIP Archives:**
    * Do **NOT** automatically compress folders or create `.zip` archives unless explicitly requested by the user. Keep tools maintained as clean, direct source directories and files within the workspace.
 
-6. **Keep C Source Code in `setup_ui/` and Binaries in Tool Subfolders:**
+5. **Keep C Source Code in `setup_ui/` and Binaries in Tool Subfolders:**
    * Only use `setup_ui` when the user explicitly asks for a graphical Setup UI or controller-selectable menu. When used, place the compiled `setup_ui` binary inside the tool's subfolder (`daemon/` or `app/`) and keep all `.c` source files in [`setup_ui/`](file:///d:/me/r36h/tools/setup_ui/).
 
-7. **Follow `playfe` Naming & Subfolder Hiding Rules in `/roms/tools/`:**
-   * **Stem-Matching Rule (Menu Tools — Archetypes 1 & 3):** For any tool that places a top-level launcher `.sh` in `/roms/tools/`, its subfolder name (`<tool_name>/`) normalized to lowercase alphanumeric (`[a-z0-9]`, length `> 4`) **MUST** be a substring of the top-level `.sh` filename stem so `playfe` automatically hides the subfolder from the menu (e.g., `/roms/tools/Screen_Off.sh` (`screenoff`) auto-hides `/roms/tools/screen_off/`; `/roms/tools/Start_Web_Terminal.sh` (`startwebterminal`) auto-hides `/roms/tools/web_terminal/`).
-   * **Non-Menu Tools Must Hide Their `.sh` Scripts in `/roms/tools/gamelist.xml` (Archetypes 2 & 4):** Any tool that does **NOT** want an icon displayed in the `TOOLS` menu (i.e. has no matching top-level `.sh` launcher in `/roms/tools/`, such as `power_button`, `quick_tools`, `tools_menu`, `mercusys_wifi`) **MUST** include a step in its `Install_*.sh` script to update `/roms/tools/gamelist.xml` and set `<hidden>true</hidden>` for all `.sh` files inside its own folder (`$SCRIPT_DIR`).
+6. **Universal Stem-Matching Naming Standard (Auto-Hides Setup/Subfolders without `gamelist.xml` Code):**
+   * **Core Principle:** Every tool installed under `/roms/tools/<tool_name>/` **MUST** place at least one top-level launcher `.sh` directly in `/roms/tools/` whose filename stem matches the subfolder name according to the Stem-Matching Formula. By following this standard, `playfe` automatically skips scanning the internal subfolder natively, completely eliminating the need to write Python/XML snippets to inject `<hidden>true</hidden>` into `gamelist.xml`.
+   * **The Stem-Matching Formula:**
+     1. `clean_name`: Convert string to lowercase and strip all non-alphanumeric characters (`[a-z0-9]`).
+     2. **Length Constraint:** `length(clean_dir) > 4` (must have at least 5 alphanumeric characters).
+     3. **Substring Constraint:** `clean_dir` **MUST** be a substring of `clean_launcher` (`clean_dir ⊆ clean_launcher`).
+   * **Standard Naming Formulas by Archetype:**
+     * **Archetype 1 (On-Demand Services):**
+       - Subfolder: `/roms/tools/<service_name>/` (e.g. `web_terminal/` $\rightarrow$ `"webterminal"`)
+       - Top-Level Launcher: `/roms/tools/Start_<service_name>.sh` (e.g. `"startwebterminal"`)
+       - Result: `"webterminal"` $\subseteq$ `"startwebterminal"` $\rightarrow$ **Auto-Hidden!**
+     * **Archetype 2 (Background Daemons / Services):**
+       - Subfolder: `/roms/tools/<daemon_name>/` (e.g. `power_button/` $\rightarrow$ `"powerbutton"`)
+       - Top-Level Launcher: `/roms/tools/Status_<daemon_name>.sh` or `Setup_<daemon_name>.sh` (e.g. `Status_Power_Button.sh` $\rightarrow$ `"statuspowerbutton"`)
+       - Result: `"powerbutton"` $\subseteq$ `"statuspowerbutton"` $\rightarrow$ **Auto-Hidden!** (Gives user a useful Status/Setup entrypoint without cluttering the menu with internal scripts).
+     * **Archetype 3 (One-Shot Utilities — Single Launcher):**
+       - Subfolder: `/roms/tools/<tool_name>/` (e.g. `speedtest/` $\rightarrow$ `"speedtest"`)
+       - Top-Level Launcher: `/roms/tools/<tool_name>.sh` (e.g. `Speedtest.sh` $\rightarrow$ `"speedtest"`)
+       - Result: `"speedtest"` $\subseteq$ `"speedtest"` $\rightarrow$ **Auto-Hidden!**
+     * **Archetype 3 (One-Shot Utilities — Multi-Action / Toggle Launchers):**
+       - Subfolder: `/roms/tools/<common_prefix>/` (e.g. `set_led/` $\rightarrow$ `"setled"`)
+       - Top-Level Launchers: `/roms/tools/<Common_Prefix>_<Action1>.sh`, `<Common_Prefix>_<Action2>.sh` (e.g. `Set_LED_to_Red.sh` $\rightarrow$ `"setledtored"`, `Set_LED_to_Blue.sh` $\rightarrow$ `"setledtoblue"`)
+       - Result: `"setled"` $\subseteq$ `"setledtored"` and `"setled"` $\subseteq$ `"setledtoblue"` $\rightarrow$ **Auto-Hidden!**
+   * **Technical Reference (`gamelist.xml` Fallback):**
+     - Modifying `gamelist.xml` via Python `xml.etree.ElementTree` with `<hidden>true</hidden>` is retained strictly as an optional technical fallback for legacy tools or pure non-menu drivers, but is **NOT required or recommended** for tools adhering to this naming standard.
 
 ---
 
@@ -286,7 +224,7 @@ flowchart LR
 ### Testing Lifecycle Steps
 
 1. **Step 1: Upload (SFTP / SCP)**
-   * Target Host: `192.168.1.9` (Port: `22`, User: `ark`, Pass: `ark`)
+   * Target Host: User-provided IP (e.g. `192.168.1.205`; always ask user for current IP if unknown) (Port: `22`, User: `ark`, Pass: `ark`)
    * Transfer tool package to `/roms/tools/<tool_directory>/`
    * Sync entrypoint shortcuts to `/roms/tools/`
    * Ensure executable permissions: `chmod 755 /roms/tools/*.sh /roms/tools/<tool_directory>/*.sh`
@@ -480,6 +418,46 @@ Key technical findings and platform quirks discovered on physical R36H running p
   * Inspect the definition of uppercase `'C'` (ASCII 67):
     * If `'C'` contains `{0x3C, 0x66, 0x03, 0x03, 0x03, 0x66, 0x3C, 0x00}`: `0x03` (`00000011b`) has its 1s in lower bits (bits 0 and 1) representing the left vertical spine of the 'C'. This table is **LSB-first** and **MUST** use `(bits & (1 << col))`.
     * If `'C'` contains `{0x3C, 0x66, 0xC0, 0xC0, 0xC0, 0x66, 0x3C, 0x00}`: `0xC0` (`11000000b`) has its 1s in upper bits (bits 7 and 6) representing the left vertical spine of the 'C'. This table is **MSB-first** and **MUST** use `(bits & (0x80 >> col))`.
+
+---
+
+### 8. Power Indicator LED Hardware Architecture & Color Switching (R36H / RK3326)
+* **Target Hardware:** R36H (`HL-R36H-V20`) running playOS / ArkOS base.
+* **Legacy DTB Dummy Node:**
+  * `/sys/class/leds/blue:heartbeat` is mapped to `gpio-17` (`GPIO0_C1`). This is a legacy entry inherited from the Odroid Go Advance / RG351 device tree and is **NOT** connected to the physical LED on R36H. Writing to it has no visible effect.
+* **Active Hardware LED Pin (`gpio77`):**
+  * The physical bi-color status LED is wired directly to **`gpio77`** (`GPIO2_PB5`).
+  * **2-State Bi-Color Drive:**
+    * `gpio77 = 0` (Logic Low): Powers the **BLUE LED** (referred to as "Green" in legacy ArkOS scripts like `Change LED to Green.sh` and `batt_life_warning.py.green`).
+    * `gpio77 = 1` (Logic High): Powers the **RED LED** (matches `Change LED to Red.sh` and `batt_life_warning.py.red`).
+    * `gpio77 direction: in` (High-Z): Circuit pull-down leaves the Blue LED illuminated.
+  * **Software Turn-Off Limitation:**
+    * The physical LED circuit is a direct 1-bit, 2-state design without a hardware power-gate / cutoff transistor.
+    * **The LED cannot be completely turned off via software.** It will always display either Blue (`0`) or Red (`1`). To completely black it out, users must apply physical opaque tape (e.g. electrical tape) over the LED inside the shell.
+* **Battery Life Daemon Integration (`batt_led.service`):**
+  * `batt_led.service` runs `/usr/local/bin/batt_life_warning.py` in the background, constantly enforcing the LED color every 30 seconds.
+  * **Persistent Color Switching:** To make color changes stick across reboots and runtime:
+    1. Update `/sys/class/gpio/gpio77/value` immediately.
+    2. Copy the corresponding boot script (`/usr/local/bin/fix_power_led.red` or `.green`) to `/usr/local/bin/fix_power_led`.
+    3. Copy the corresponding battery warning daemon script (`/usr/local/bin/batt_life_warning.py.red` or `.green`) to `/usr/local/bin/batt_life_warning.py`.
+    4. Restart the service: `systemctl restart batt_led`.
+
+### 9. Wi-Fi Driver Architecture, Realtek Firmware & RTL8188EU Kernel Quirks
+* **Hardware & Peripherals:** Mercusys MW150US USB Wi-Fi dongle (`2c4e:0102 Mercusys INC 802.11n NIC`) using Realtek **RTL8188EU / RTL8188EUS** chipset on playOS (Linux Kernel `4.4.189` / ARM64).
+* **RTL8188EU vs. Built-in RTL8188FU:**
+  * playOS kernel compiles `rtl8188fu` as a built-in static driver (`=y`). It cannot be managed via `modprobe`.
+  * The Mercusys dongle (`2c4e:0102`) is **NOT** RTL8188FU; force-binding to `rtl8188fu` causes controller lockup. The correct driver is external module **`8188eu.ko`**.
+* **HAL Ops Check Failure & Firmware Dependency:**
+  * Missing firmware `/lib/firmware/rtlwifi/rtl8188eufw.bin` aborts HAL initialization halfway, causing `RTW: #### rtw_hal_ops_check - Error : Please hook hal_func.set_hw_reg_handler ####`.
+  * Verified working firmware: `rtl8188eufw.bin` (`15,262 bytes`, MD5: `b66178b87ed8f917997b9cf38fc0cfd3`).
+  * Verified working module: `8188eu.ko` (`1,167,320 bytes`, MD5: `959e7febc4be3bf6909fa877de7809b1`).
+* **Hardware Stall & Cold Boot Requirement:**
+  * Realtek USB microcontrollers latch into a hardware "Stall State" if initialization fails.
+  * Soft reboots (`reboot`) do **not** cut power to the OTG USB port.
+  * A full cold boot (`shutdown now`) is required to drain power rail capacitors and reset the dongle to a clean state.
+* **Full Reference:** See [`WIFI_HARDWARE_GUIDE.md`](file:///d:/me/r36h/tools/WIFI_HARDWARE_GUIDE.md).
+
+
 
 
 

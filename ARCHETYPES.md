@@ -55,7 +55,7 @@ All tools developed or maintained in this workspace **MUST** adhere strictly to 
       ├── <daemon_script>     <-- Python PMIC/evdev listener or daemon binary
       └── <tool>.service      <-- Systemd background service unit
   ```
-* **System & `playfe` Integration:** Running `Install_<Tool>.sh` registers the service into `/etc/systemd/system/`, enables it for boot-time autostart, starts it immediately, and updates `/roms/tools/gamelist.xml` to mark all `.sh` files inside its own folder as `<hidden>true</hidden>` so they do not clutter the `TOOLS` menu on playOS.
+* **System & `playfe` Integration:** Running `Install_<Tool>.sh` registers the service into `/etc/systemd/system/`, enables it for boot-time autostart, and copies `Status_<Tool>.sh` (or `Setup_<Tool>.sh`) to `/roms/tools/`. Because `"status<tool>"` contains `"<tool>"`, `playfe` automatically skips scanning the internal daemon folder via native Stem-Matching, keeping the menu clean without requiring any `gamelist.xml` modification. (Modifying `gamelist.xml` remains available as a legacy fallback).
 
 ---
 
@@ -90,3 +90,24 @@ All tools developed or maintained in this workspace **MUST** adhere strictly to 
   └── README.txt              <-- User manual & documentation
   ```
 * **EmulationStation / `playfe` Integration:** None (Hidden). These utilities are executed once from the terminal emulator or via remote SSH session. Their `Install_<Tool>.sh` script marks all `.sh` scripts in their own subfolder as `<hidden>true</hidden>` in `/roms/tools/gamelist.xml` so the `/roms/tools/` menu stays uncluttered.
+
+---
+
+## 3. Universal Stem-Matching Auto-Hiding Formula Table (Zero-`gamelist.xml`)
+
+To prevent installer (`Install_*.sh`) and teardown (`Uninstall_*.sh`) scripts from leaking into the `TOOLS` menu of `playfe`, all tools should leverage the **Stem-Matching Auto-Skip Rule** (`clean_dir ⊆ clean_launcher`, length `> 4` chars). 
+
+When this standard is met, `playfe` skips scanning the tool's internal subfolder natively:
+
+| Tool Archetype | Subfolder Name (`/roms/tools/`) | Normalized Dir (`clean_dir`) | Top-Level Launcher (`/roms/tools/`) | Normalized Launcher (`clean_launcher`) | Auto-Hide Condition | Result in `playfe` Menu |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Archetype 1** (On-Demand Service) | `web_terminal/` | `"webterminal"` (11 chars) | `Start_Web_Terminal.sh` | `"startwebterminal"` | `"webterminal"` $\subseteq$ `"startwebterminal"` | **Auto-Hidden** (Clean menu) |
+| **Archetype 2** (Background Daemon) | `power_button/` | `"powerbutton"` (11 chars) | `Status_Power_Button.sh` | `"statuspowerbutton"` | `"powerbutton"` $\subseteq$ `"statuspowerbutton"` | **Auto-Hidden** (Clean menu) |
+| **Archetype 3** (One-Shot Single) | `speedtest/` | `"speedtest"` (9 chars) | `Speedtest.sh` | `"speedtest"` | `"speedtest"` $\subseteq$ `"speedtest"` | **Auto-Hidden** (Clean menu) |
+| **Archetype 3** (One-Shot Multi-Action) | `set_led/` | `"setled"` (6 chars) | `Set_LED_to_Red.sh`<br>`Set_LED_to_Blue.sh` | `"setledtored"`<br>`"setledtoblue"` | `"setled"` $\subseteq$ `"setledto..."` | **Auto-Hidden** (Clean menu) |
+| *(Anti-Pattern)* Mismatched Subfolder | `led_color/` | `"ledcolor"` (8 chars) | `Set_LED_to_Red.sh` | `"setledtored"` | `"ledcolor"` $\not\subseteq$ `"setledtored"` | ❌ **Leaks `Install_*.sh`!** |
+| *(Anti-Pattern)* Short Subfolder | `led/` | `"led"` (3 chars $\le$ 4) | `Start_LED.sh` | `"startled"` | Length $\le 4$ fails auto-skip | ❌ **Leaks `Install_*.sh`!** |
+
+> [!TIP]
+> By strictly adhering to this table, **setup scripts do NOT need to write any Python or XML code to modify `gamelist.xml`**, keeping installation fast, robust, and completely self-contained.
+
