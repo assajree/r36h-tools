@@ -159,7 +159,7 @@ static void present_frame(SDL_Renderer *rend, SDL_Texture *canvas, int flip_h) {
 }
 
 int main(int argc, char *argv[]) {
-    int total_seconds = 3;
+    int total_seconds = 10;
     int flip_h = 0; /* Default to 0 (normal left-to-right orientation) */
 
     for (int i = 1; i < argc; i++) {
@@ -169,7 +169,7 @@ int main(int argc, char *argv[]) {
             flip_h = 1;
         } else {
             int s = atoi(argv[i]);
-            if (s > 0 && s <= 10) total_seconds = s;
+            if (s > 0 && s <= 30) total_seconds = s;
         }
     }
 
@@ -320,7 +320,7 @@ int main(int argc, char *argv[]) {
         draw_centered_text(rend, 320, card_y + 160, "SHUTTING DOWN IN SECONDS", 1, 161, 161, 170);
 
         /* 5. Smooth Progress Bar */
-        int bar_w = 380;
+        int bar_w = 440;
         int bar_h = 14;
         int bar_x = 320 - (bar_w / 2);
         int bar_y = card_y + 195;
@@ -339,7 +339,7 @@ int main(int argc, char *argv[]) {
         }
 
         /* 6. Action Legend Pill */
-        int action_w = 380;
+        int action_w = 440;
         int action_h = 36;
         int action_x = 320 - (action_w / 2);
         int action_y = card_y + 245;

@@ -20,7 +20,7 @@ import signal
 import fcntl
 
 HOLD_SECONDS = 1.0
-COUNTDOWN_SECONDS = 3
+COUNTDOWN_SECONDS = 10
 KEY_POWER = 116  # Linux KEY_POWER code
 EV_KEY = 1
 EVIOCGRAB = 0x40044590  # Linux ioctl to grab input device exclusively
@@ -211,7 +211,7 @@ def run_loop():
         time.sleep(5)
         return
 
-    log(f"Listening for power button events on {dev_path} (Hold {HOLD_SECONDS}s for 3s countdown)")
+    log(f"Listening for power button events on {dev_path} (Hold {HOLD_SECONDS}s for {COUNTDOWN_SECONDS}s countdown)")
 
     try:
         # Open in non-blocking mode to guarantee read will never hang the process
