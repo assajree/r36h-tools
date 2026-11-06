@@ -31,6 +31,7 @@ systemctl disable power-button-daemon.service 2>/dev/null || true
 print_msg "[2/3] กำลังลบไฟล์ระบบ..."
 rm -f /etc/systemd/system/power-button-daemon.service
 rm -f /usr/local/bin/power_button_daemon.py
+rm -f /usr/local/bin/countdown_ui
 
 print_msg "[3/3] กำลังรีโหลด Systemd Daemon..."
 systemctl daemon-reload

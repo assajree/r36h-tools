@@ -42,10 +42,15 @@ fi
 print_msg "[1/5] กำลังตรวจสอบและหยุด Service เดิม (ถ้ามี)..."
 systemctl stop power-button-daemon.service 2>/dev/null || true
 
-# 3. Install daemon script
-print_msg "[2/5] กำลังติดตั้งสคริปต์ไปยัง /usr/local/bin/..."
+# 3. Install daemon script and UI binary
+print_msg "[2/5] กำลังติดตั้งสคริปต์และคอมไพล์ UI..."
 cp -f "$DAEMON_DIR/power_button_daemon.py" /usr/local/bin/power_button_daemon.py
 chmod 755 /usr/local/bin/power_button_daemon.py
+
+if [ -f "$DAEMON_DIR/countdown_ui.c" ]; then
+    gcc -O2 "$DAEMON_DIR/countdown_ui.c" -lSDL2 -o /usr/local/bin/countdown_ui 2>/dev/null || true
+    chmod 755 /usr/local/bin/countdown_ui 2>/dev/null || true
+fi
 
 # 4. Install systemd service unit
 print_msg "[3/5] กำลังติดตั้ง Systemd Service..."

@@ -150,96 +150,36 @@ def drain_inputs(fds):
 
 def countdown_and_shutdown(power_fd, power_dev_path):
     """
-    Displays a 3-second countdown on /dev/tty1.
+    Launches the graphical SDL2 KMSDRM countdown UI overlay.
     If ANY button is pressed on gamepad/keys during this period,
-    cancellation is triggered and the system returns to normal.
+    countdown_ui exits with code 1 (cancellation).
+    If timer expires without cancellation, it exits with code 0 (shutdown).
     """
-    log("1-second hold reached. Starting 3-second cancellation countdown...")
+    log("1-second hold reached. Launching graphical countdown UI...")
 
-    # 1. Collect all other input event devices (gamepad, keys, etc.)
-    other_fds = []
-    for path in sorted(glob.glob("/dev/input/event*")):
+    ui_bin = "/usr/local/bin/countdown_ui"
+    if not os.path.exists(ui_bin):
+        ui_bin = "/roms/tools/power_button/daemon/countdown_ui"
+
+    if os.path.exists(ui_bin):
         try:
-            if os.path.samefile(path, power_dev_path):
-                continue
-        except Exception:
-            pass
-        try:
-            ofd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
-            other_fds.append(ofd)
-        except Exception:
-            pass
+            res = subprocess.run([ui_bin, str(COUNTDOWN_SECONDS)], timeout=COUNTDOWN_SECONDS + 2)
+            if res.returncode == 0:
+                log("UI countdown completed. Proceeding with safe shutdown...")
+                trigger_safe_shutdown()
+                while True:
+                    time.sleep(10)
+            else:
+                log("UI countdown CANCELLED by user button press.")
+                drain_inputs([power_fd])
+                return
+        except Exception as e:
+            log(f"UI execution error: {e}")
 
-    # 2. Drain any pending events completely non-blocking
-    drain_inputs(other_fds)
-
-    cancelled = False
-
-    try:
-        for remaining in range(COUNTDOWN_SECONDS, 0, -1):
-            log(f"Countdown: {remaining}s remaining...")
-            notify_screen(
-                "============================================================\n"
-                f"             กำลังจะปิดเครื่องใน {remaining} วินาที...\n"
-                "        >>> กดปุ่มใดก็ได้บนเครื่องเพื่อยกเลิก <<<\n"
-                "============================================================"
-            )
-
-            step_deadline = time.monotonic() + 1.0
-            while time.monotonic() < step_deadline:
-                wait_sec = max(0.01, step_deadline - time.monotonic())
-                if other_fds:
-                    r, _, _ = select.select(other_fds, [], [], min(0.05, wait_sec))
-                    if r:
-                        for ready_fd in r:
-                            try:
-                                while True:
-                                    data = os.read(ready_fd, 24)
-                                    if len(data) < 24:
-                                        break
-                                    sec, usec, etype, code, val = struct.unpack("qqHHi", data)
-                                    # Any EV_KEY press (val == 1) cancels!
-                                    if etype == EV_KEY and val == 1:
-                                        log(f"Cancellation button detected (code {code}) on fd {ready_fd}")
-                                        cancelled = True
-                                        break
-                            except Exception:
-                                pass
-                            if cancelled:
-                                break
-                else:
-                    time.sleep(min(0.05, wait_sec))
-
-                if cancelled:
-                    break
-            if cancelled:
-                break
-
-        if cancelled:
-            log("Shutdown CANCELLED by user button press.")
-            notify_screen(
-                "============================================================\n"
-                "             [✓] ยกเลิกการปิดเครื่องแล้ว                   \n"
-                "                    กำลังกลับสู่หน้าจอเดิม...                 \n"
-                "============================================================"
-            )
-            time.sleep(1.0)
-            clear_screen()
-            drain_inputs(other_fds)
-            drain_inputs([power_fd])
-            return
-
-        # Countdown expired without cancellation -> Proceed with safe shutdown!
-        trigger_safe_shutdown()
-        while True:
-            time.sleep(10)
-
-    finally:
-        for ofd in other_fds:
-            try:
-                os.close(ofd)
-            except Exception:
-                pass
+    # Fallback to direct shutdown if UI binary is not found
+    trigger_safe_shutdown()
+    while True:
+        time.sleep(10)
 
 def run_loop():
     dev_path = find_power_device()
