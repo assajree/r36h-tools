@@ -17,6 +17,7 @@
 | [`quick_tools/`](file:///d:/me/r36h/tools/quick_tools/) | Archetype 4 (Mount) | *(ซ่อนใน gamelist.xml)* | สร้างทางลัด `/roms/00_tools` แบบ Bind Mount เพื่อให้เข้าถึง Tools ได้จากหน้าแรก |
 | [`tools_menu/`](file:///d:/me/r36h/tools/tools_menu/) | Archetype 4 (Config) | *(ซ่อนใน gamelist.xml)* | เปิดใช้งานแท็บหมวดหมู่ `TOOLS` ใน `es_systems.cfg` บน playOS 4.0 (`playfe`) |
 | [`set_led/`](file:///d:/me/r36h/tools/set_led/) | Archetype 3 (One-Shot) | `Set_LED_to_Red.sh`<br>`Set_LED_to_Blue.sh` | สลับสีไฟสถานะ LED (สีแดง/สีน้ำเงิน) จำค่าข้ามการรีบูต + ปรับปรุง `batt_led.service` |
+| [`nfsu2_thai/`](file:///d:/me/r36h/tools/nfsu2_thai/) | Archetype 3 (One-Shot) | `NFSU2_Language_Thai.sh`<br>`NFSU2_Language_English.sh`<br>`Uninstall_NFSU2_Thai.sh` | ติดตั้งภาษาไทย NFSU2 ทันทีตอน Install, เมนูสลับภาษาบนเครื่อง, และกู้คืนไฟล์เดิมพร้อมถอนการติดตั้ง |
 | [`screen_off/`](file:///d:/me/r36h/tools/screen_off/) | Archetype 2 & 3 | `Screen_Off.sh` | สั่งดับไฟหน้าจอ (Backlight) ทันทีเพื่อประหยัดแบตเตอรี่ + Auto Screen Off Daemon (1 นาที) |
 | [`power_button/`](file:///d:/me/r36h/tools/power_button/) | Archetype 2 (Daemon) | *(ซ่อนใน gamelist.xml)* | Background Daemon ดักฟังปุ่ม Power (กดค้าง 1 วิ แสดงนับถอยหลัง 3 วิก่อนปิดเครื่อง) |
 | [`setup_ui/`](file:///d:/me/r36h/tools/setup_ui/) | Engine / Shared | `Demo_Setup.sh`<br>`Demo_Dialog_TUI.sh` | ไลบรารีกลาง C/SDL2 KMSDRM UI Setup Wizard และ `fb0_mirror` สำหรับแสดง TUI จริง |
@@ -95,6 +96,17 @@ d:\me\r36h\tools\
 │   └── app/                         <-- Internal application subfolder
 │       ├── Set_LED_to_Red.sh        <-- Instant switch to Red with boot persistence
 │       └── Set_LED_to_Blue.sh       <-- Instant switch to Blue with boot persistence
+├── nfsu2_thai/                       <-- Need for Speed: Underground 2 Thai & Tools
+│   ├── Install_NFSU2_Tools.sh       <-- Standalone installer (Auto-Setup game & installs Tools)
+│   ├── README.txt                   <-- User guide & instructions
+│   └── app/                         <-- Internal application subfolder
+│       ├── NFSU2_Language_Thai.sh   <-- Instant switch to Thai
+│       ├── NFSU2_Language_English.sh<-- Instant switch to English
+│       ├── Uninstall_NFSU2_Thai.sh  <-- Restore original files from .backup_thai/ & clean menu
+│       ├── generate_icons.py        <-- Icon generation utility
+│       └── gamedata/                <-- Game assets for auto-setup
+│           ├── SPEED2.EXE           <-- Pre-patched Thai executable (4.78 MB)
+│           └── LANGUAGES/           <-- Thailand.bin (264 KB, Name entry safe)
 ├── screen_off/                       <-- Screen Preserver / Backlight Shutoff Utility
 │   ├── Install_Screen_Off.sh        <-- Standalone installer for /roms/tools/ & PATH
 │   ├── Uninstall_Screen_Off.sh      <-- Clean uninstaller for full Screen Off suite
