@@ -1,66 +1,74 @@
 ==============================================================================
-Screen Off / Screen Saver Utility Suite for R36H (playOS)
+Screen Off / Screen Saver Utility Suite for R36H & Handhelds (playOS & ArkOS)
 ==============================================================================
 
-[ ข้อมูลทั่วไป ]
-ชุดเครื่องมือสำหรับสั่ง "ดับไฟหน้าจอ (Backlight Off 100%)" ทั้งแบบสั่งการเองทันที
-และแบบอัตโนมัติ (Auto Screen Off) เมื่อไม่มีการใช้งานครบ 1 นาที เพื่อ:
-1. ถนอมจอภาพและป้องกันความร้อนสะสมเมื่อเปิดเครื่องทิ้งไว้นานๆ
-2. ประหยัดพลังงานแบตเตอรี่สูงสุด
-3. ระบบหลัก (CPU / Wi-Fi / SSH / Web File Manager / งานดาวน์โหลดไฟล์) ยังคงทำงานต่อเนื่อง 100% 
-   ไม่ถูก Suspend/Sleep เหมือนการกดสลีปปกติ จึงทำให้การดาวน์โหลดและโอนไฟล์ไม่หลุด
+[ General Information / ข้อมูลทั่วไป ]
+A lightweight, offline-first Screen Off utility suite designed for playOS 4.0 and ArkOS.
+Turns off LCD backlight 100% (and blanks fb0) instantly or automatically after an idle timeout.
+Features:
+1. Protects screen from heat buildup when leaving device on.
+2. Minimizes battery consumption.
+3. Keeps CPU, Wi-Fi, SSH, Web File Manager, and background downloads running 100%.
 
 ------------------------------------------------------------------------------
-[ โครงสร้างไดเรกทอรี (Directory Structure) ]
+[ Directory Structure / โครงสร้างไดเรกทอรี ]
 ------------------------------------------------------------------------------
 screen_off/
-├── Install_Screen_Off.sh        <-- ติดตั้งเมนู Screen_Off.sh สำหรับสั่งดับจอทันที
-├── Uninstall_Screen_Off.sh      <-- ถอนการติดตั้งระบบ Screen Off ทั้งหมด
-├── Setup_Auto_Screen_Off.sh     <-- ติดตั้งและเปิดระบบดับจออัตโนมัติ (1 นาที)
-├── Status_Auto_Screen_Off.sh    <-- ตรวจสอบสถานะการทำงานของระบบ Auto Screen Off
-├── Uninstall_Auto_Screen_Off.sh <-- ปิดและถอนการติดตั้งเฉพาะระบบ Auto Screen Off
-├── README.txt                   <-- คู่มือการใช้งาน
-├── app/                         <-- รันไทม์แอพพลิเคชัน
-│   └── Screen_Off.sh            <-- สคริปต์ดับจอทันที พร้อม Dual-Input Wake Listener
-└── daemon/                      <-- เบื้องหลังระบบดับจออัตโนมัติ
-    ├── auto_screen_off_daemon.py <-- Daemon ตรวจจับการกดปุ่ม (Idle 60s)
-    └── auto-screen-off.service   <-- Systemd Service Unit สำหรับบูตอัตโนมัติ
+├── Screen_Off_Setup.sh          <-- Top-level launcher (All-in-One TUI Manager)
+├── README.txt                   <-- Documentation & User Guide
+├── images/                      <-- Pre-packaged cover art directory for Ports/Tools
+│   ├── Screen_Off-thumb.png     <-- 512x512 cover art for Screen_Off.sh
+│   └── Screen_Off_Setup-thumb.png <-- 512x512 cover art for Screen_Off_Setup.sh
+└── screen_off/                  <-- Internal data folder (side-by-side)
+    ├── app/                     <-- Core scripts, cover arts & status config
+    │   ├── Screen_Off.sh        <-- Instant screen off script (Smart Key-Down Wake)
+    │   ├── Screen_Off-thumb.png
+    │   ├── Screen_Off_Setup-thumb.png
+    │   └── status.conf          <-- Persistent status configuration
+    └── daemon/                  <-- Background idle listener & systemd service
+        ├── auto_screen_off_daemon.py
+        └── auto-screen-off.service
 
 ------------------------------------------------------------------------------
-[ โหมดที่ 1: ดับจอทันทีเมื่อต้องการ (Manual Screen Off) ]
+[ Deployment / วิธีติดตั้งลงเครื่อง ]
 ------------------------------------------------------------------------------
-1. วิธีติดตั้ง:
-   sudo bash /roms/tools/screen_off/Install_Screen_Off.sh
+Copy 'Screen_Off_Setup.sh', 'images/', and 'screen_off/' together into either:
+  1. /roms/ports/  (Recommended: PORTS menu is enabled by default on all systems)
+  2. /roms/tools/  (Alternative: if TOOLS menu is enabled)
 
-2. วิธีใช้งาน:
-   - ผ่านเมนู EmulationStation: เข้าเมนู Tools -> เลือก "Screen_Off.sh"
-   - ผ่าน Terminal / SSH: พิมพ์คำสั่ง screen_off
+Then on your R36H console:
+  Go to Ports (or Tools) -> Launch "Screen_Off_Setup.sh" -> Select "Install Screen Off"
 
-3. วิธีปลุกหน้าจอ:
-   - กดปุ่มใดก็ได้บนตัวเครื่อง (D-Pad, A/B/X/Y, Shoulder Buttons) หรือ คีย์บอร์ด
-   - หน้าจอจะสว่างกลับมาทันที
+Once installed, two clean menu items will appear:
+  • Screen_Off.sh        : Instant manual screen blackout
+  • Screen_Off_Setup.sh  : Change idle timeout or uninstall anytime
 
-------------------------------------------------------------------------------
-[ โหมดที่ 2: ดับจออัตโนมัติเมื่อวางเครื่องทิ้งไว้ 1 นาที (Auto Screen Off) ]
-------------------------------------------------------------------------------
-1. วิธีติดตั้งและเปิดใช้งาน (One-Click Setup):
-   sudo bash /roms/tools/screen_off/Setup_Auto_Screen_Off.sh
+Dynamic State-Aware Actions:
+• When NOT installed:
+    1. Install Screen Off (choose idle timeout & install)
+• When ALREADY installed:
+    1. Config TimeOut     (change idle minutes timeout)
+    2. Uninstall          (cleanly remove all shortcuts, service, & binaries)
 
-   ระบบจะเริ่มทำงานทันที และเปิดตัวเองอัตโนมัติทุกครั้งที่เปิดเครื่อง (Boot Autostart)
-   หากไม่มีการกดปุ่มใดๆ นานเกิน 1 นาที (60 วินาที) หน้าจอจะดับเองทันที
-
-2. วิธีปลุกหน้าจอ:
-   - แตะหรือกดปุ่มใดก็ได้บนตัวเครื่อง หรือ คีย์บอร์ด หน้าจอจะตื่นกลับมาทันที
-
-3. วิธีตรวจสอบสถานะการทำงาน:
-   sudo bash /roms/tools/screen_off/Status_Auto_Screen_Off.sh
-
-4. วิธีปิดการทำงานเฉพาะระบบ Auto Screen Off:
-   sudo bash /roms/tools/screen_off/Uninstall_Auto_Screen_Off.sh
+Selectable Idle Timeout Options (in minutes):
+    [ ] Disabled
+    [ ] 1 Minute
+    [ ] 3 Minutes
+    [ ] 5 Minutes
+    [*] 10 Minutes (Default)
+    [ ] 15 Minutes
+    [ ] 30 Minutes
 
 ------------------------------------------------------------------------------
-[ วิธีถอนการติดตั้งทั้งหมด (Total Uninstallation) ]
+[ How to Use / วิธีใช้งาน ]
 ------------------------------------------------------------------------------
-รันคำสั่ง:
-   sudo bash /roms/tools/screen_off/Uninstall_Screen_Off.sh
+1. Instant Manual Screen Off:
+   - In EmulationStation / playfe: Go to "Tools" -> Launch "Screen_Off.sh"
+   - Or in Terminal / SSH: Run 'screen_off'
+   - Waking up: Press ANY button on the handheld or keyboard to restore backlight instantly.
+
+2. Auto Screen Off Daemon:
+   - Runs silently in the background as a systemd service.
+   - When no buttons are pressed for the configured idle minutes, the screen turns off automatically.
+   - Press ANY button to wake the screen immediately.
 ==============================================================================

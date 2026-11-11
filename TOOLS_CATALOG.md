@@ -18,8 +18,8 @@
 | [`tools_menu/`](file:///d:/me/r36h/tools/tools_menu/) | Archetype 4 (Config) | *(ซ่อนใน gamelist.xml)* | เปิดใช้งานแท็บหมวดหมู่ `TOOLS` ใน `es_systems.cfg` บน playOS 4.0 (`playfe`) |
 | [`set_led/`](file:///d:/me/r36h/tools/set_led/) | Archetype 3 (One-Shot) | `Set_LED_to_Red.sh`<br>`Set_LED_to_Blue.sh` | สลับสีไฟสถานะ LED (สีแดง/สีน้ำเงิน) จำค่าข้ามการรีบูต + ปรับปรุง `batt_led.service` |
 | [`nfsu2_thai/`](file:///d:/me/r36h/tools/nfsu2_thai/) | Archetype 3 (One-Shot) | `NFSU2_Language_Thai.sh`<br>`NFSU2_Language_English.sh`<br>`Uninstall_NFSU2_Thai.sh` | ติดตั้งภาษาไทย NFSU2 ทันทีตอน Install, เมนูสลับภาษาบนเครื่อง, และกู้คืนไฟล์เดิมพร้อมถอนการติดตั้ง |
-| [`screen_off/`](file:///d:/me/r36h/tools/screen_off/) | Archetype 2 & 3 | `Screen_Off.sh` | สั่งดับไฟหน้าจอ (Backlight) ทันทีเพื่อประหยัดแบตเตอรี่ + Auto Screen Off Daemon (1 นาที) |
-| [`power_button/`](file:///d:/me/r36h/tools/power_button/) | Archetype 2 (Daemon) | *(ซ่อนใน gamelist.xml)* | Background Daemon ดักฟังปุ่ม Power (กดค้าง 1 วิ แสดงนับถอยหลัง 3 วิก่อนปิดเครื่อง) |
+| [`screen_off/`](file:///d:/me/r36h/tools/screen_off/) | Archetype 2 & 3 | `Screen_Off.sh`<br>`Screen_Off_Setup.sh` | สั่งดับไฟหน้าจอ (Backlight) ทันทีแบบเงียบสนิท + เมนูจัดการตั้งค่า All-in-One TUI (Screen_Off_Setup.sh) บน playfe / Tools menu |
+| [`power_button/`](file:///d:/me/r36h/tools/power_button/) | Archetype 2 (Daemon) | `Power_Button_Setup.sh` | All-in-One TUI Manager ดักฟังปุ่ม Power (ตั้งเวลา Hold 1-3s, Countdown 3-10s, Short Press Action, รับยกเลิกเฉพาะ A/B/X/Y) |
 | [`setup_ui/`](file:///d:/me/r36h/tools/setup_ui/) | Engine / Shared | `Demo_Setup.sh`<br>`Demo_Dialog_TUI.sh` | ไลบรารีกลาง C/SDL2 KMSDRM UI Setup Wizard และ `fb0_mirror` สำหรับแสดง TUI จริง |
 | [`rtl/`](file:///d:/me/r36h/tools/rtl/) | Assets / Firmware | — | คลังไฟล์ Microcode เฟิร์มแวร์ Realtek RTL8xxx จาก dArkOS |
 | [`XNL RTL8188FTV/`](file:///d:/me/r36h/tools/XNL%20RTL8188FTV/) | Reference | — | ซอร์สโค้ดและไฟล์อ้างอิงไดรเวอร์ RTL8188FU จากผู้ผลิต |
@@ -107,29 +107,35 @@ d:\me\r36h\tools\
 │       └── gamedata/                <-- Game assets for auto-setup
 │           ├── SPEED2.EXE           <-- Pre-patched Thai executable (4.78 MB)
 │           └── LANGUAGES/           <-- Thailand.bin (264 KB, Name entry safe)
-├── screen_off/                       <-- Screen Preserver / Backlight Shutoff Utility
-│   ├── Install_Screen_Off.sh        <-- Standalone installer for /roms/tools/ & PATH
-│   ├── Uninstall_Screen_Off.sh      <-- Clean uninstaller for full Screen Off suite
-│   ├── Setup_Auto_Screen_Off.sh     <-- One-click setup for Auto Screen Off (1 min idle)
-│   ├── Status_Auto_Screen_Off.sh    <-- Status inspector (PID, RAM, service status, logs)
-│   ├── Uninstall_Auto_Screen_Off.sh <-- Teardown script for Auto Screen Off daemon only
+├── screen_off/                       <-- Screen Preserver / Backlight Shutoff Utility Suite
+│   ├── Screen_Off_Setup.sh          <-- Top-level launcher (All-in-one TUI manager)
 │   ├── README.txt                   <-- User guide & instructions
-│   ├── app/                         <-- Internal application subfolder
-│   │   └── Screen_Off.sh            <-- Dual-output screen off & dual-input wake launcher
-│   └── daemon/                      <-- Auto screen off daemon subfolder
-│       ├── auto_screen_off_daemon.py <-- Python idle listener (60s timeout)
-│       └── auto-screen-off.service  <-- Systemd background service unit
-├── power_button/                     <-- Power Button Hold-to-Shutdown Daemon
-│   ├── Setup_UI.sh                  <-- Interactive Setup UI Wizard (SDL2)
-│   ├── Install_Power_Button.sh      <-- Standalone installer & service activator
-│   ├── Status_Power_Button.sh       <-- Status inspector (PID, RAM, device, logs)
-│   ├── Uninstall_Power_Button.sh    <-- Clean uninstaller & teardown script
-│   ├── README.txt                   <-- User guide & instructions
-│   └── daemon/                      <-- Internal daemon subfolder
-│       ├── setup_ui                 <-- Standalone ARM64 Universal Setup UI binary
-│       ├── countdown_ui             <-- Standalone ARM64 Countdown Overlay binary
-│       ├── power_button_daemon.py   <-- Python PMIC event listener (3s hold trigger)
-│       └── power-button-daemon.service <-- Systemd background service unit
+│   ├── images/                      <-- Pre-packaged cover arts for Ports/Tools
+│   │   ├── Screen_Off-thumb.png     <-- Cover art thumbnail for Screen_Off.sh
+│   │   └── Screen_Off_Setup-thumb.png <-- Cover art thumbnail for Screen_Off_Setup.sh
+│   └── screen_off/                  <-- Internal data subfolder (side-by-side layout)
+│       ├── app/                     <-- Application launchers, cover arts & status config
+│       │   ├── Screen_Off.sh        <-- Silent instant screen blackout & smart wake launcher
+│       │   ├── Screen_Off-thumb.png
+│       │   ├── Screen_Off_Setup-thumb.png
+│       │   └── status.conf          <-- Persistent status configuration
+│       └── daemon/                  <-- Auto screen off background daemon
+│           ├── auto_screen_off_daemon.py <-- Python idle listener (configurable timeout in minutes)
+│           └── auto-screen-off.service  <-- Systemd background service unit
+├── power_button/                     <-- Power Button Hold-to-Shutdown Suite (Archetype 2)
+│   ├── Power_Button_Setup.sh         <-- All-in-One TUI Manager (Install, Config, Uninstall)
+│   ├── README.txt                    <-- User guide & instructions
+│   ├── images/                       <-- Cover arts for Ports / Tools frontend
+│   │   └── Power_Button_Setup-thumb.png
+│   └── power_button/                 <-- Internal data subfolder (side-by-side)
+│       ├── Power_Button_Setup.sh     <-- Launcher mirror
+│       ├── app/                      <-- Runtime status config & cover arts
+│       │   ├── Power_Button_Setup-thumb.png
+│       │   └── status.conf           <-- Persistent settings config
+│       └── daemon/                   <-- Background system daemon
+│           ├── countdown_ui          <-- Standalone ARM64 Countdown Overlay (cancellable via A/B/X/Y)
+│           ├── power_button_daemon.py<-- Dynamic config PMIC event listener
+│           └── power-button-daemon.service <-- Systemd background service unit
 ├── setup_ui/                         <-- Universal Setup UI & Framebuffer Mirror Engine (SDL2 KMSDRM)
 │   ├── setup_ui.c                   <-- Direct SDL2 KMSDRM Universal Setup UI source
 │   ├── fb0_mirror.c                 <-- /dev/fb0 (/dev/tty1) to KMSDRM mirror & TIOCSTI input bridge

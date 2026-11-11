@@ -1,9 +1,18 @@
 # NCURSES_TUI_GUIDE.md — Running Genuine Linux ncurses TUI (`dialog` / `whiptail`) on R36H (playOS 4.0)
 
-## 1. Executive Summary
-On the R36H running **playOS 4.0**, standard Linux ncurses TUI programs (`dialog`, `whiptail`, `alsamixer`, `htop`) written for `/dev/tty1` do **not** appear on screen when launched from **`playOS Terminal` (`FindManager`)** or **`playfe`**, and controller buttons fail to respond.
+> [!CAUTION] DEPRECATION NOTICE: `fb0_mirror` is DEPRECATED
+> **Do NOT use, compile, or bundle `fb0_mirror` in tool suites.**
+> On both `playOS` (`playfe`) and `ArkOS` (`emulationstation`), launching a tool script from the menu automatically pauses frontend rendering and grants direct control of `/dev/tty1`. Running an auxiliary framebuffer-capturing daemon (`fb0_mirror`) creates redundant processes, risks TIOCSTI race conditions, and introduces unnecessary failure points.
+>
+> **Mandatory Modern Standard:**
+> - Render terminal user interfaces using genuine Linux `dialog` outputting directly to the text console / `/dev/tty1`.
+> - Translate gamepad inputs into console keystrokes using `/opt/inttools/gptokeyb` or `/usr/bin/gptokeyb`.
+> - Ensure 100% feature and visual parity between `playOS` and `ArkOS` natively without secondary mirror binaries.
 
-This guide documents the complete hardware/kernel display architecture discovered on the R36H (`Rockchip RK3326`, kernel `4.4.189`), the **4 critical kernel/SDL2 pitfalls**, and how **[`fb0_mirror`](file:///d:/me/r36h/tools/setup_ui/fb0_mirror.c)** solves all of them so genuine ncurses TUI applications work 100% seamlessly at 60 FPS.
+## 1. Executive Summary
+On the R36H running **playOS 4.0** or **ArkOS**, interactive setup managers and diagnostic tools use standard Linux ncurses `dialog` rendered directly to the text console (`/dev/tty1`) and controlled via the gamepad using `gptokeyb`.
+
+This guide documents the display architecture, terminal queue management, and the critical pitfalls to prevent glitches like unresponsive D-pads or raw ANSI escape codes (`^[[B`).
 
 ---
 
@@ -75,17 +84,102 @@ When bridging `/dev/fb0` onto the KMSDRM screen via SDL2, four subtle hardware a
   1. Never pass `mmap("/dev/fb0")` to OpenGL ES. Allocate a standard heap buffer (`malloc(FB_SIZE)`) and read `/dev/fb0` via **`pread(fb_fd, ram_buf, FB_SIZE, 0)`** (`< 0.3 ms` per frame), then pass `ram_buf` to `SDL_UpdateTexture()`.
   2. Always use **`killall -STOP FindManager playfe`** / **`killall -CONT FindManager playfe`** (which checks `/proc/<pid>/stat` `comm` without locking `mmap_sem`) instead of `pkill -f`.
 
-### Pitfall 4: Capturing `dialog` Output Without Breaking `/dev/tty1` Rendering or `--gauge` Pipes
+### Pitfall 4: Capturing `dialog` Output & Preventing `--gauge` Pipe Deadlocks
+* **Root Causes:**
+  1. **Subshell FD Redirection Conflicts:** Using `--output-fd 3 3>&1 1>&2 2>&3 < /dev/tty1 > /dev/tty1` inside `$()` subshells causes standard output redirection collisions with `/dev/tty1`, frequently returning empty strings and triggering unintended fallback options.
+  2. **`--gauge` Stdin Override Hang:** `dialog --gauge` reads progress updates (`0..100`, `XXX\nMessage\nXXX`) strictly from `stdin`. Adding `< /dev/tty1` or `< "$DIALOG_IN"` to `dialog --gauge` overrides `stdin`, disconnecting it from the pipe (`|`). The subshell's updates are never consumed, and `dialog` hangs indefinitely at 0% waiting for keyboard input from the terminal!
+* **Standard Fixes:**
+  * **For Interactive Menus (`--menu`, `--radiolist`, `--checklist`):** Always capture selection to a temporary file:
+    ```bash
+    dialog ... 2> "$CHOICE_TMP" < "$DIALOG_IN" > "$DIALOG_OUT"
+    RET=$?
+    SELECTED=$(cat "$CHOICE_TMP" 2>/dev/null | tr -d ' "\r\n')
+    rm -f "$CHOICE_TMP"
+    ```
+  * **For Progress Bars (`--gauge`):** Pipe `stdin` normally and redirect **ONLY** stdout and stderr to the screen:
+    ```bash
+    (
+        echo "25" ; echo "XXX" ; echo "Working..." ; echo "XXX" ; sleep 0.3
+        ...
+        echo "100"; echo "XXX" ; echo "Done!" ; echo "XXX"
+    ) | dialog --gauge "\nPlease wait..." 9 58 0 > "$DIALOG_OUT" 2>/dev/null
+    # CRITICAL: NEVER include < "$DIALOG_IN" on dialog --gauge!
+    ```
+
+### Pitfall 5: Gamepad Button Mapping Conflict & Dual-Frontend A/B Inversion
 * **Root Cause:**
-  * By default, `dialog` draws its TUI to `stdout` (`fd 1`) and prints the user's selected menu item to `stderr` (`fd 2`).
-  * Furthermore, `dialog --gauge` reads percentage updates (`0..100`) from `stdin` (`fd 0`). If `< /dev/tty1` is added to `dialog --gauge`, `/dev/tty1` overrides the pipe and `dialog --gauge` hangs at `0%`.
-* **Fix:**
-  * For interactive menus (`--menu`, `--radiolist`, `--checklist`, `--inputbox`), attach `fd 0, 1, 2` to `/dev/tty1` and capture the selection via **`--output-fd 3 3>&1 < /dev/tty1 > /dev/tty1 2>/dev/tty1`**.
-  * For progress bars (`--gauge`), pipe `stdin` normally and redirect **only** `stdout` and `stderr` to `/dev/tty1` (`> /dev/tty1 2>/dev/tty1`, **no** `< /dev/tty1`).
+  * If `fb0_mirror.c` maps both Button A (`305`) and Button B (`304`) to `\n` (Enter), users cannot back out, cancel menus, or dismiss dialogs without physical keyboard hardware.
+  * Furthermore, different frontends define "Confirm / Cancel" swaps oppositely:
+    * **`playfe` (playOS)**: `swap_ab=false` (Off) means `B = OK`, `A = Back` (Western default). `swap_ab=true` (On) means `A = OK`, `B = Back`.
+    * **EmulationStation (ArkOS)**: Normal means `A = OK`, `B = Back`. `InvertButtons="true"` or `/var/cache/Switch_AB` means `B = OK`, `A = Back`.
+* **Fix (`get_button_mapping`):**
+  1. Dynamically inspect the active frontend configuration:
+     * **Priority 1 (`playfe`)**: Read `/home/ark/.config/playfe/playfe.cfg`. If present, `swap_ab=true` maps `A (305) = OK, B (304) = Cancel`; otherwise `B (304) = OK, A (305) = Cancel`.
+     * **Priority 2 (ArkOS fallback)**: If `playfe.cfg` is absent, check `/home/ark/.emulationstation/es_settings.cfg` (`InvertButtons`) and `/var/cache/Switch_AB`.
+  2. For the Cancel button, inject **`\033\033` (Double ESC)** instead of single ESC (`\033`). In Linux `dialog`, double ESC triggers an immediate abort (exit code 1) without waiting for escape sequence timeouts (`ESCDELAY`).
+
+### Pitfall 6: Frontend Restart Deadlock (Never Restart playfe or EmulationStation from Menu Scripts)
+* **Root Cause (Parent-Child Deadlock):** When a tool or script is launched from the console's menu (`/roms/ports/` or `/roms/tools/`), it executes as a child process inside the frontend's systemd cgroup (`playfe.service` or `emulationstation.service`).
+  * If the script runs `systemctl restart playfe.service` or `systemctl restart emulationstation.service`, `systemctl` synchronously blocks waiting for systemd to restart the service.
+  * Meanwhile, systemd waits for all child processes in the active service cgroup (including the script itself) to terminate before starting the service anew!
+  * Result: A **90-second systemd deadlock** (`State 'final-sigterm' timed out`), leaving the screen frozen on a cleared black console with a blinking cursor at the top left corner!
+* **System Invariant:**
+  * In `playOS 4.0`, `playfe` launches scripts with `sudo perfmax ...; nice -n -19 %ROM%; sudo perfnorm`. It automatically pauses rendering and waits synchronously for the child script to exit.
+  * The instant the script exits (`exit 0`), `playfe` regains the screen in **0.1 seconds** with zero flickering or delay.
+  * Furthermore, `playfe` actively monitors filesystem changes via inotify (`[playfe] library changed on disk: reloaded`), discovering newly added shortcuts and artwork automatically without restarting.
+* **Fix:** **Never invoke `systemctl restart` on the frontend service from inside any menu-launched script.** Let the script exit cleanly via `exit 0`.
+
+### Pitfall 7: Avoid `dialog --radiolist` on Handheld Gamepads (Always Use `--menu` + `--default-item`)
+* **Root Cause:** In Linux ncurses `dialog`, `--radiolist` requires pressing `Space` to toggle an option's radio dot `(*)`, and then `Enter` to confirm.
+  * On handheld game consoles, gamepad bridges like `gptokeyb` map button `A` directly to `Enter`.
+  * When a user navigates to an option using the D-Pad and presses `A` (`Enter`) without pressing Space, `dialog` submits whatever item was marked `on` by default (e.g. 10 minutes), completely ignoring the newly highlighted option!
+* **Symptom:** User selects "1 Minute" with D-Pad and presses A, but the configuration applies "10 Minutes".
+* **Standard Fix:**
+  * For single-choice selection on handheld game consoles, **always use `dialog --menu` with `--default-item "$CURRENT_VALUE"`** instead of `--radiolist`.
+  * With `--menu`, D-Pad moves the highlight cursor, and pressing `A` (`Enter`) immediately selects and submits that highlighted value.
+
+### Pitfall 8: Raw Escape Sequences (`^[[B`) & Unresponsive D-Pad Due to Orphan Processes
+* **Root Cause:** When pressing D-pad Down, `gptokeyb` injects `KEY_DOWN` into `/dev/uinput`, which the kernel keyboard driver translates into ANSI sequence `\033[B` (`^[[B`).
+  * If a previous or background instance of `dialog`, `bash`, or `gptokeyb` is lingering on `/dev/tty1`, or if `/dev/tty1` is left in canonical mode (`icanon`) with `echo` on:
+    1. The kernel tty line discipline buffers characters waiting for Enter (`\n`), preventing the active `dialog` instance from receiving arrow key events.
+    2. The tty driver echoes the raw escape characters straight onto the screen as literal text: `^[[B`.
+* **Symptom:** D-pad presses do not move the selection bar, and `^[[B` or `^[[A` appears scattered across the screen.
+* **Standard Fix:**
+  1. **Kill Orphan Instances on Startup:** Always terminate previous instances of `gptokeyb` and any sibling setup processes before launching the TUI:
+     ```bash
+     pkill -9 -f "gptokeyb.*$SCRIPT_NAME" 2>/dev/null || true
+     ```
+  2. **Direct Invocation (No Subshell Function Wrapper):** Call `dialog` directly with standard I/O redirection:
+     ```bash
+     dialog ... 2> "$CHOICE_TMP" < "$DIALOG_IN" > "$DIALOG_OUT"
+     ```
+     Avoid wrapping `dialog` inside a bash helper function that nests redirection (`dialog "$@" < "$DIALOG_IN" > "$DIALOG_OUT"` with external `2> "$CHOICE_TMP"`), which can scramble termios descriptor bindings.
+  3. **Clean Teardown:** Ensure `trap cleanup EXIT INT TERM HUP` restores terminal visibility and cursor state:
+     ```bash
+     printf "\033c\e[?25h" > /dev/tty1 2>/dev/null || true
+     ```
 
 ---
 
-## 4. When to Use `setup_ui` vs. `fb0_mirror` + `dialog`
+## 4. Action Completion & Exit Lifecycle Standard
+
+When designing interactive setup wizards and managers:
+
+1. **Install and Uninstall (One-Shot Actions):**
+   * Upon successful completion, display the summary dialog (`dialog --msgbox`) with: `Press A or Enter to exit.`
+   * When the user confirms with `A`, call **`exit 0` directly**, returning control immediately to `playfe`.
+2. **Configuration (Single-Config vs Multi-Config):**
+   * **Single-Config Tool (only 1 setting, e.g. `Screen Off` which only has "Config TimeOut"):**
+     * Adjusting this single setting completes the user's intent. Display the summary dialog with `Press A or Enter to exit.` and **`exit 0` directly**.
+   * **Multi-Config Tool (offers $\ge 2$ configuration settings):**
+     * Adjusting one setting should display `Press A or Enter to continue.` and **return to the Main Setup Menu**, allowing the user to configure additional settings in the same session without having to re-launch the tool from the frontend.
+     * The user exits when finished by selecting the menu's `Exit` option (or Button `B` / Cancel).
+3. **Cancellation (Button B / Cancel / Back):**
+   * Pressing Cancel/Back in sub-dialogs must always return to the Setup Menu to allow selecting another option.
+
+---
+
+## 5. When to Use `setup_ui` vs. `fb0_mirror` + `dialog`
 
 Both engines are stored centrally in [`setup_ui/`](file:///d:/me/r36h/tools/setup_ui/):
 
@@ -93,12 +187,12 @@ Both engines are stored centrally in [`setup_ui/`](file:///d:/me/r36h/tools/setu
 | :--- | :--- | :--- |
 | **Rendering Method** | Direct SDL2 KMSDRM vector/bitmap renderer (renders an ncurses-style 3D dialog box natively) | Kernel `fbcon` renders genuine `/usr/bin/dialog` into `/dev/fb0` → streamed to KMSDRM via SDL2 |
 | **Configuration Style** | Declarative INI/Block text via `stdin` (`[page]`, `[progress]`, `option = ...`) | Standard Bash `dialog` commands (`dialog --menu`, `--yesno`, `--gauge`, `--msgbox`) |
-| **Control Scheme** | Custom R36H scheme: `UP/DOWN` = Option, `LEFT/RIGHT` = `<OK>/<Back>/<Exit>`, `A/B` = Confirm | Standard Linux `dialog` navigation (`UP/DOWN/LEFT/RIGHT`, `A/B` = Enter, `X/Y` = Space, `SELECT` = Tab) |
+| **Control Scheme** | Custom R36H scheme: `UP/DOWN` = Option, `LEFT/RIGHT` = `<OK>/<Back>/<Exit>`, `A/B` = Confirm | Dynamic OS-aware navigation (`UP/DOWN/LEFT/RIGHT`, `A/B` = Dynamic OK/Cancel matching playfe or ArkOS, `X/Y` = Space, `SELECT` = Tab) |
 | **Best Use Case** | New R36H Setup Wizards (`Setup_UI.sh`) needing clean declarative multi-step pages with built-in `[ Back ]` history stack | Running genuine Linux `dialog`/`whiptail` TUI scripts or porting existing ArkOS/XNL `dialog` installers to playOS 4.0 |
 
 ---
 
-## 5. Standard Shell Script Template for Real `dialog` TUI (`fb0_mirror`)
+## 6. Standard Shell Script Template for Real `dialog` TUI (`fb0_mirror`)
 
 Copy [`setup_ui/fb0_mirror`](file:///d:/me/r36h/tools/setup_ui/fb0_mirror) into your tool's subfolder (`app/fb0_mirror` or `daemon/fb0_mirror`) and use this pattern (see [`setup_ui/Demo_Dialog_TUI.sh`](file:///d:/me/r36h/tools/setup_ui/Demo_Dialog_TUI.sh)):
 

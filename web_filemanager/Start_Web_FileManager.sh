@@ -33,7 +33,7 @@ wait_for_exit() {
     # 2. Listen for gamepad button events (evdev)
     for ev in /dev/input/event*; do
         if [ -r "$ev" ]; then
-            ( dd if="$ev" of=/dev/null bs=16 count=1 2>/dev/null ) &
+            ( dd if="$ev" of=/dev/null bs=48 count=1 2>/dev/null ) &
             INPUT_PIDS="$INPUT_PIDS $!"
         fi
     done

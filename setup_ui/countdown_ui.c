@@ -236,16 +236,19 @@ int main(int argc, char *argv[]) {
         Uint32 now = SDL_GetTicks();
         Uint32 elapsed = now - start_time;
 
-        /* Check inputs for cancellation */
+        /* Check inputs for cancellation (Strictly Face Buttons A, B, X, Y or Key Cancel) */
         while (SDL_PollEvent(&ev)) {
             if (ev.type == SDL_KEYDOWN) {
-                cancelled = 1;
-                break;
+                /* Allow standard cancel/action keys */
+                SDL_Keycode k = ev.key.keysym.sym;
+                if (k == SDLK_SPACE || k == SDLK_RETURN || k == SDLK_ESCAPE ||
+                    k == SDLK_a || k == SDLK_b || k == SDLK_x || k == SDLK_y) {
+                    cancelled = 1;
+                    break;
+                }
             } else if (ev.type == SDL_JOYBUTTONDOWN) {
-                cancelled = 1;
-                break;
-            } else if (ev.type == SDL_JOYHATMOTION) {
-                if (ev.jhat.value != SDL_HAT_CENTERED) {
+                /* On R36H gamepad, Face Buttons A, B, X, Y are indices 0..3 */
+                if (ev.jbutton.button <= 3) {
                     cancelled = 1;
                     break;
                 }
@@ -350,7 +353,7 @@ int main(int argc, char *argv[]) {
         SDL_SetRenderDrawColor(rend, 63, 63, 70, 255);
         SDL_RenderDrawRect(rend, &action_rect);
 
-        draw_centered_text(rend, 320, action_y + 10, "PRESS ANY BUTTON TO CANCEL", 2, 250, 250, 250);
+        draw_centered_text(rend, 320, action_y + 10, "PRESS A, B, X, OR Y TO CANCEL", 2, 250, 250, 250);
 
         present_frame(rend, canvas, flip_h);
         SDL_Delay(16); /* ~60 FPS smooth animation */

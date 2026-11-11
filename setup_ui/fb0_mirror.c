@@ -16,8 +16,15 @@
  *      `/dev/null`, avoids `SDL_PollEvent()`, and restores `KDSKBMODE = K_UNICODE` +
  *      `KDSETMODE = KD_TEXT` so SDL2 cannot steal keystrokes from `dialog`.
  *   4. Translates R36H hardware gamepad events (`/dev/input/event*`) into ANSI keys
- *      (`\033[A`, `\033[B`, `\033[C`, `\033[D`, `\n`, ` `, `\t`) injected into
+ *      (`\033[A`, `\033[B`, `\033[C`, `\033[D`, `\n`, ` `, `\t`, `\033\033`) injected into
  *      `/dev/tty1` via `ioctl(tty_fd, TIOCSTI, &c)`.
+ *   5. Real-time dynamic OS button mapping (supports both playOS playfe and legacy ArkOS):
+ *      - Priority 1 (playOS playfe): Reads `/home/ark/.config/playfe/playfe.cfg`:
+ *          * swap_ab=true  (On)         : Button A (305) = OK (Enter) | Button B (304) = Back (Double ESC)
+ *          * swap_ab=false / unset (Off): Button B (304) = OK (Enter) | Button A (305) = Back (Double ESC)
+ *      - Priority 2 (Legacy ArkOS / EmulationStation, when playfe.cfg is absent):
+ *          * InvertButtons=true or /var/cache/Switch_AB: Button B (304) = OK | Button A (305) = Back
+ *          * Standard / Normal ES                      : Button A (305) = OK | Button B (304) = Back
  */
 
 #include <SDL2/SDL.h>
@@ -29,6 +36,7 @@
 #include <glob.h>
 #include <dirent.h>
 #include <signal.h>
+#include <time.h>
 #include <sys/ioctl.h>
 #include <linux/fb.h>
 #include <linux/kd.h>
@@ -106,7 +114,72 @@ static void inject_tty_str(int tty_fd, const char *s) {
     }
 }
 
+/* Dynamically resolve OK (Select) and Cancel (Back) based on active OS frontend config */
+static void get_button_mapping(int *code_ok, int *code_cancel) {
+    int a_is_ok = 0;
+    int found_playfe = 0;
+
+    /* 1. Priority 1: playfe configuration (/home/ark/.config/playfe/playfe.cfg) */
+    FILE *fp = fopen("/home/ark/.config/playfe/playfe.cfg", "r");
+    if (fp) {
+        found_playfe = 1;
+        a_is_ok = 0; /* playfe default (swap_ab=false or unset): B = OK, A = Back */
+        char line[256];
+        while (fgets(line, sizeof(line), fp)) {
+            if (strncmp(line, "swap_ab=", 8) == 0) {
+                if (strstr(line, "true")) {
+                    a_is_ok = 1; /* On: A = OK, B = Back */
+                } else {
+                    a_is_ok = 0; /* Off: B = OK, A = Back */
+                }
+                break;
+            }
+        }
+        fclose(fp);
+    }
+
+    /* 2. Priority 2: Fallback for pure ArkOS / EmulationStation (when playfe.cfg is absent) */
+    if (!found_playfe) {
+        int invert = 0;
+        fp = fopen("/home/ark/.emulationstation/es_settings.cfg", "r");
+        if (fp) {
+            char line[256];
+            while (fgets(line, sizeof(line), fp)) {
+                if (strstr(line, "InvertButtons") && strstr(line, "true")) {
+                    invert = 1;
+                    break;
+                }
+            }
+            fclose(fp);
+        }
+        if (!invert && access("/var/cache/Switch_AB", F_OK) == 0) {
+            invert = 1;
+        }
+
+        /* Default in ES: A = OK (invert=0 -> a_is_ok=1). If InvertButtons=true: B = OK (a_is_ok=0) */
+        a_is_ok = invert ? 0 : 1;
+    }
+
+    if (a_is_ok) {
+        *code_ok = 305;     /* Button A */
+        *code_cancel = 304; /* Button B */
+    } else {
+        *code_ok = 304;     /* Button B */
+        *code_cancel = 305; /* Button A */
+    }
+}
+
 static void poll_and_inject_keys(int tty_fd) {
+    static int code_ok = 305;
+    static int code_cancel = 304;
+    static time_t s_last_check = 0;
+
+    time_t now = time(NULL);
+    if (now - s_last_check >= 1) {
+        get_button_mapping(&code_ok, &code_cancel);
+        s_last_check = now;
+    }
+
     struct input_event ie;
     for (int i = 0; i < num_ev_fds; i++) {
         while (read(ev_fds[i], &ie, sizeof(ie)) == sizeof(ie)) {
@@ -119,9 +192,12 @@ static void poll_and_inject_keys(int tty_fd) {
                     inject_tty_str(tty_fd, "\033[D");
                 } else if (ie.code == 547 || ie.code == 106) { /* D-Pad RIGHT */
                     inject_tty_str(tty_fd, "\033[C");
-                } else if (ie.value == 1 && (ie.code == 305 || ie.code == 304 || ie.code == 705 || ie.code == 28)) {
-                    /* Button A (305) or B (304) or START (705) -> Enter */
+                } else if (ie.value == 1 && (ie.code == code_ok || ie.code == 705 || ie.code == 28)) {
+                    /* OK / Select / Enter */
                     inject_tty_str(tty_fd, "\n");
+                } else if (ie.value == 1 && (ie.code == code_cancel || ie.code == 1)) {
+                    /* Cancel / Back / Exit */
+                    inject_tty_str(tty_fd, "\033\033");
                 } else if (ie.value == 1 && (ie.code == 307 || ie.code == 308)) {
                     /* Button X (307) or Y (308) -> Space (toggle checklist/radiolist) */
                     inject_tty_str(tty_fd, " ");
