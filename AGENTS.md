@@ -86,7 +86,8 @@ Every tool developed in this workspace must adhere to the **Dual-Execution Contr
      ```
 
 5. **Action Completion & Exit Lifecycle Standard:**
-   * **Install & Uninstall:** Always treated as One-Shot actions. Upon completion, show a summary dialog (`dialog --msgbox`) stating `Press A or Enter to exit.` and immediately call `exit 0` to return control to the frontend.
+   * **Install Actions for Services/Daemons:** Always treated as One-Shot actions. When installation completes, the script **MUST immediately start the service** (`systemctl start <service>` or daemon execution), prepare necessary virtual roots/symlinks, and display a summary dialog showing active status, PID, IP, and URLs with `Press A or Enter to exit.` before calling `exit 0` directly. Never leave a newly installed service in an inactive/stopped state.
+   * **Uninstall Actions:** Always treated as One-Shot actions. Cleanly stop services, remove system units/binaries, show confirmation dialog, and call `exit 0` to return to frontend.
    * **Single-Config Tools (e.g. `Screen Off` with only 1 setting):** Completing configuration finishes the user's intent. Show summary with `Press A or Enter to exit.` and call `exit 0` directly.
    * **Multi-Config Tools ($\ge 2$ settings):** Completing one setting must show `Press A or Enter to continue.` and **return to the Main Setup Menu**, allowing the user to configure additional settings in the same session without re-opening the app. Exiting is performed manually via the menu's `Exit` option (or Button `B` / Cancel).
    * **Cancel / Back (Button B):** Always returns to the Setup Menu to allow choosing another action.
@@ -307,6 +308,17 @@ Key technical findings and platform quirks discovered on physical R36H running p
 * **Port 80 Collision:** Because `filebrowser` is already running on port 80 out of the box, any script that attempts to start a second instance without checking process status will fail immediately with:
   `Error: listen tcp 0.0.0.0:80: bind: address already in use`
 * **Default Database & Credentials:** The system default database is `/home/ark/.config/filebrowser.db` (default auth: `ark:ark`, scope `/`). When configuring `noauth` or installing custom database instances (`/usr/local/share/filebrowser.db`), also apply `filebrowser config set -d /home/ark/.config/filebrowser.db --auth.method=noauth` so boot-time services adhere to the unauthenticated open-access policy.
+* **Virtual Root & User Scope Trap (`--scope .`):**
+  * When pointing FileBrowser root to a virtual directory (e.g. `/var/run/webfilemanager/root`) containing symlinks to multiple storage drives (`/roms`, `/roms2`), changing only the `-r` flag is **insufficient**.
+  * If the existing database holds a user profile with `Scope: /roms`, FileBrowser concatenates the paths and searches for `/var/run/webfilemanager/root/roms`, resulting in fatal HTTP 404 (`lstat ... no such file or directory`) errors.
+  * **Mandatory Fix:** Always explicitly reset the user scope to `.` when configuring or installing:
+    ```bash
+    "$BIN" config set -d "$DB_PATH" --scope . -r /var/run/webfilemanager/root
+    "$BIN" users update 1 --scope . -d "$DB_PATH"
+    ```
+* **CLI Flags vs Database-Only Settings:**
+  * FileBrowser CLI accepts only core flags (`-a`, `-p`, `-r`, `-d`, `--noauth`, `--followExternalSymlinks`).
+  * Appearance and theme flags (e.g., `--branding.theme`, `--branding.name`, `--hideLoginButton`) are **database-only** options. Passing them directly to `ExecStart` CLI causes systemd service failure with `unknown flag`. Always inject them beforehand via `filebrowser config set -d "$DB_PATH"`.
 
 ### 2. Process Matching Standard (`pgrep -x` vs `pgrep -f`)
 * **Short Name vs. Full Path:**

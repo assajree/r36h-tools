@@ -1,0 +1,14 @@
+[Unit]
+Description=File Browser Web Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+ExecStartPre=/bin/bash -c "mkdir -p /var/run/webfilemanager/root && rm -rf /var/run/webfilemanager/root/* && if [ -d /roms/ports ]; then ln -sfn /roms/ports '/var/run/webfilemanager/root/[Quick Link] Ports'; fi && if [ -d /roms/tools ]; then ln -sfn /roms/tools '/var/run/webfilemanager/root/[Quick Link] Tools'; fi && if [ -d /roms ]; then ln -sfn /roms '/var/run/webfilemanager/root/[Storage] SD1 - Internal ROMs'; fi && if [ -d /roms2 ]; then ln -sfn /roms2 '/var/run/webfilemanager/root/[Storage] SD2 - External ROMs'; else mkdir -p '/var/run/webfilemanager/root/[Storage] SD2 - External ROMs'; fi"
+ExecStart=/usr/local/bin/filebrowser --noauth --followExternalSymlinks -a 0.0.0.0 -p 80 -r /var/run/webfilemanager/root -d /usr/local/share/filebrowser.db
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

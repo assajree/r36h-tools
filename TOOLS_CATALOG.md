@@ -9,7 +9,7 @@
 | ไดเรกทอรี | Archetype | รายการเมนูใน `/roms/tools/` | หน้าที่หลัก & คำอธิบายสั้น |
 | :--- | :--- | :--- | :--- |
 | [`mercusys_wifi/`](file:///d:/me/r36h/tools/mercusys_wifi/) | Archetype 4 (Driver) | *(ซ่อนใน gamelist.xml)* | ติดตั้งไดรเวอร์ RTL8188EU (`8188eu.ko`) สำหรับ USB Wi-Fi ดองเกิล Mercusys MW150US |
-| [`web_filemanager/`](file:///d:/me/r36h/tools/web_filemanager/) | Archetype 1 (Service) | `Start_Web_FileManager.sh`<br>`Stop_Web_FileManager.sh` | เว็บเบราว์เซอร์จัดการไฟล์แบบไร้สาย (Filebrowser พอร์ต 80) ส่องตรงเข้า `/roms/` |
+| [`WebFileManager/`](file:///d:/me/r36h/tools/WebFileManager/) | Archetype 1 (Service) | `WebFileManager.sh` | เว็บเบราว์เซอร์จัดการไฟล์แบบไร้สาย (Filebrowser พอร์ต 80) รวม Start/Stop/Auto-Start ใน TUI เดียว |
 | [`web_terminal/`](file:///d:/me/r36h/tools/web_terminal/) | Archetype 1 (Service) | `Start_Web_Terminal.sh`<br>`Stop_Web_Terminal.sh` | เว็บเทอร์มินัลไร้สาย (ttyd พอร์ต 7681) สิทธิ์ Root Shell ควบคุมเครื่องผ่านเบราว์เซอร์ |
 | [`check_usb/`](file:///d:/me/r36h/tools/check_usb/) | Archetype 3 (One-Shot) | `check_usb.sh` | ตรวจสอบอุปกรณ์ USB OTG, ชิปเซ็ตที่เชื่อมต่อ, และไดรเวอร์เคอร์เนลที่โหลดอยู่ |
 | [`speedtest/`](file:///d:/me/r36h/tools/speedtest/) | Archetype 3 (One-Shot) | `Speedtest.sh` | วัดความเร็วอินเทอร์เน็ต (Ping / Download / Upload) แสดงผลสองภาษาบนหน้าจอเครื่อง |
@@ -48,12 +48,17 @@ d:\me\r36h\tools\
 │       ├── Repair_Mercusys_WiFi.sh  <-- Diagnostic & repair tool
 │       ├── Check_WiFi_Signal.sh     <-- Wi-Fi signal & status monitor
 │       └── *.sh                      <-- Individual helper scripts
-├── web_filemanager/                  <-- Wireless Web File Browser (Filebrowser)
-│   ├── filebrowser                   <-- ARM64 standalone binary
-│   ├── Install_Web_FileManager.sh   <-- Setup script
-│   ├── Start_Web_FileManager.sh     <-- Launcher with on-screen IP display
-│   ├── Stop_Web_FileManager.sh      <-- Teardown script to reclaim RAM for games
-│   └── README.txt                    <-- User guide
+├── WebFileManager/                   <-- Wireless Web File Browser (PortMaster Standard)
+│   ├── WebFileManager.sh            <-- All-in-One TUI Manager launcher (Ports entrypoint)
+│   ├── README.txt                   <-- User guide & instructions
+│   ├── images/                      <-- Pre-packaged cover art folder
+│   │   └── WebFileManager-thumb.png <-- 512x512 cover art for Ports/Tools menu
+│   └── webfilemanager/              <-- Internal data subfolder (PortMaster flat hierarchy)
+│       ├── filebrowser              <-- ARM64 standalone binary
+│       ├── filebrowser.service      <-- Systemd service template
+│       ├── status.conf              <-- Persistent state config
+│       └── images/
+│           └── WebFileManager-thumb.png
 ├── web_terminal/                     <-- Wireless Web Terminal (ttyd)
 │   ├── Install_Web_Terminal.sh      <-- Setup script
 │   ├── Uninstall_Web_Terminal.sh    <-- Clean uninstaller script
