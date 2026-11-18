@@ -159,6 +159,22 @@ When bridging `/dev/fb0` onto the KMSDRM screen via SDL2, four subtle hardware a
      printf "\033c\e[?25h" > /dev/tty1 2>/dev/null || true
      ```
 
+### Pitfall 9: Double Key Input & Menu Skipping Due to Orphan `gptokeyb` Instances (Multiple `Fake Keyboard` Devices)
+* **Root Cause:** When `gptokeyb` starts, it registers a virtual uinput device named `Fake Keyboard`. If a previous instance of `gptokeyb` is left running (for instance, when launched via `sudo bash <script>.sh` where `$SCRIPT_NAME` became `bash`), multiple `Fake Keyboard` devices exist concurrently.
+* **Symptom:** Pressing D-Pad Down once moves the cursor down by 2 rows (skipping from 1 to 3), or pressing Confirm triggers an immediate double-enter.
+* **Standard Fix:**
+  1. In both the startup initialization and the `cleanup()` trap, execute unconditional cleanup:
+     ```bash
+     pkill -9 -f "gptokeyb" 2>/dev/null || true
+     killall -9 gptokeyb 2>/dev/null || true
+     ```
+  2. Normalize the target process name so it never binds to generic `bash`:
+     ```bash
+     TARGET_NAME="$SCRIPT_NAME"
+     [ "$TARGET_NAME" = "bash" ] || [ "$TARGET_NAME" = "sh" ] && TARGET_NAME="<My_Tool>.sh"
+     "$GPTOKEYB_BIN" -1 "$TARGET_NAME" -c "$GPTK_CONF" &
+     ```
+
 ---
 
 ## 4. Action Completion & Exit Lifecycle Standard
