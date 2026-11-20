@@ -10,6 +10,7 @@
 | :--- | :--- | :--- | :--- |
 | [`mercusys_wifi/`](file:///d:/me/r36h/tools/mercusys_wifi/) | Archetype 4 (Driver) | *(ซ่อนใน gamelist.xml)* | ติดตั้งไดรเวอร์ RTL8188EU (`8188eu.ko`) สำหรับ USB Wi-Fi ดองเกิล Mercusys MW150US |
 | [`WebFileManager/`](file:///d:/me/r36h/tools/WebFileManager/) | Archetype 1 (Service) | `WebFileManager.sh` | เว็บเบราว์เซอร์จัดการไฟล์แบบไร้สาย (Filebrowser พอร์ต 80) รวม Start/Stop/Auto-Start ใน TUI เดียว |
+| [`remote_services/`](file:///d:/me/r36h/tools/remote_services/) | Archetype 3 (One-Shot) | `Remote_Services.sh` | All-in-One TUI เปิด/ปิด Auto-Start และ Start/Stop ทันทีสำหรับ Samba (`smbd`+`nmbd`) และ FileBrowser (คง SSH ไว้เสมอ) |
 | [`web_terminal/`](file:///d:/me/r36h/tools/web_terminal/) | Archetype 1 (Service) | `Start_Web_Terminal.sh`<br>`Stop_Web_Terminal.sh` | เว็บเทอร์มินัลไร้สาย (ttyd พอร์ต 7681) สิทธิ์ Root Shell ควบคุมเครื่องผ่านเบราว์เซอร์ |
 | [`check_usb/`](file:///d:/me/r36h/tools/check_usb/) | Archetype 3 (One-Shot) | `check_usb.sh` | ตรวจสอบอุปกรณ์ USB OTG, ชิปเซ็ตที่เชื่อมต่อ, และไดรเวอร์เคอร์เนลที่โหลดอยู่ |
 | [`speedtest/`](file:///d:/me/r36h/tools/speedtest/) | Archetype 3 (One-Shot) | `Speedtest.sh` | วัดความเร็วอินเทอร์เน็ต (Ping / Download / Upload) แสดงผลสองภาษาบนหน้าจอเครื่อง |
